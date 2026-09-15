@@ -1,0 +1,16 @@
+{
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"extends": ["config:recommended", "group:allNonMajor"],
+	"dependencyDashboard": false,
+	"rebaseWhen": "behind-base-branch",
+	"packageRules": [
+		{
+			"matchUpdateTypes": ["minor", "patch", "pin", "digest"]
+		},
+		{
+			"matchPackageNames": ["typescript"],
+			"matchUpdateTypes": ["major"],
+			"enabled": false
+		}
+	]
+}
