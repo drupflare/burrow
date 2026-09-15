@@ -1,0 +1,27 @@
+name: Check Prettier Formatting
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Clang Tools
+        run: |
+          pip install clang-tools
+          clang-tools install clang-format --version 23
+          clang-format --version
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+      - name: Check C and TypeScript Formatting
+        run: bun run format:check

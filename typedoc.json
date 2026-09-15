@@ -1,0 +1,30 @@
+{
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": [
+		"src/index.ts",
+		"src/adapt.ts",
+		"src/budget.ts",
+		"src/doctor.ts",
+		"src/dylink.ts",
+		"src/errors.ts",
+		"src/interpret.ts",
+		"src/probe.ts",
+		"src/publish.ts",
+		"src/registry.ts",
+		"src/runtime.ts",
+		"src/session.ts"
+	],
+	"out": "typedoc",
+	"name": "@drupflare/burrow",
+	"readme": "README.md",
+	"projectDocuments": ["ADVANCED_USAGE.md"],
+	"includeVersion": true,
+	"excludeInternal": true,
+	"excludePrivate": true,
+	"validation": {
+		"notExported": true,
+		"invalidLink": true,
+		"notDocumented": true
+	},
+	"treatWarningsAsErrors": false
+}
