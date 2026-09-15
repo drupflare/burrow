@@ -1,0 +1,202 @@
+# @drupflare/burrow
+
+Execute arbitrary WebAssembly on Cloudflare Workers.
+
+## 📋 Table of Contents
+
+- [🎯 Why Burrow](#-why-burrow)
+- [📥 Install](#-install)
+- [🚀 Quick Start](#-quick-start)
+- [🔁 Execution Paths](#-execution-paths)
+- [🔗 Dynamic Libraries](#-dynamic-libraries)
+- [📦 Declaring a Runtime](#-declaring-a-runtime)
+- [🧮 Memory Budget](#-memory-budget)
+- [🩺 Doctor](#-doctor)
+- [🧭 Subpath Exports](#-subpath-exports)
+- [🧪 Testing](#-testing)
+- [📄 License](#-license)
+
+## 🎯 Why Burrow
+
+Cloudflare Workers forbids WebAssembly code generation at request time. A Worker cannot call
+`new WebAssembly.Module`, `WebAssembly.compile`, `eval` or `new Function`, so it cannot run code it
+did not know about at deploy time.
+
+burrow runs it anyway, by not compiling it. An interpreter compiled to wasm ships in the bundle, and
+a guest module arriving with a request is data to that interpreter. Nothing is generated, so nothing
+is blocked.
+
+The same property makes dynamic linking work. Loading a `-s SIDE_MODULE` build normally means
+producing a `funcref` for every address-taken symbol, which is code generation. To an interpreter a
+function pointer is an index into its own table, so that step does not exist.
+
+burrow ships no language runtime. The consumer provides one; burrow handles acquisition, residency
+and safety.
+
+## 📥 Install
+
+```sh
+bun add @drupflare/burrow
+```
+
+## 🚀 Quick Start
+
+```ts
+import wasm3 from '@drupflare/burrow/vendor/wasm3.wasm';
+import { createInterpreter } from '@drupflare/burrow/interpret';
+
+export default {
+  async fetch(request: Request) {
+    const vm = await createInterpreter({ module: wasm3 });
+    const guest = vm.load(new Uint8Array(await request.arrayBuffer()));
+    return Response.json({ answer: guest.call('main') });
+  }
+};
+```
+
+Host functions are plain JavaScript, which is legal here because the guest's `call_indirect` never
+touches a real funcref table:
+
+```ts
+const guest = vm.load(bytes, {
+  imports: {
+    env: {
+      now: { signature: 'i()', fn: () => Date.now() | 0 },
+      log: { signature: 'v(ii)', fn: (ptr, len) => console.log(guest.readText(ptr, len)) }
+    }
+  }
+});
+```
+
+## 🔁 Execution Paths
+
+Three paths, chosen by one question: do you know this module at deploy time?
+
+| Path        | For                                                | Speed               |
+| ----------- | -------------------------------------------------- | ------------------- |
+| `interpret` | bytes the deployment never saw                     | see the ratio below |
+| `import`    | modules that shipped in the bundle                 | 1.00x, native       |
+| `publish`   | bytes that should become native, in the background | 1.00x once live     |
+
+`interpret` is the default because it is the only one that always works. `import` is not better,
+only narrower.
+
+The interpreted ratio is set by the guest, not by burrow:
+
+> **ratio = 1 + D_cy x G**, where `G` is guest instructions retired per native cycle.
+
+The interpreter's overhead is additive and nearly constant, so what decides the ratio is how much
+the guest already stalls. A pointer chase over a 64 MiB working set measures 1.01x; the same chase
+over 16 KiB measures 4.41x; a per-byte transform measures 20x.
+
+**Match the work to the path.** Memory-bound and latency-bound work interprets for almost nothing.
+Compute-dense work with a small working set belongs in the bundle, or on the native path via
+`publish`. [ADVANCED_USAGE.md](ADVANCED_USAGE.md) carries the measured curve and the by-shape table.
+
+## 🔗 Dynamic Libraries
+
+```ts
+import { createLinker } from '@drupflare/burrow/dylink';
+
+const linker = createLinker(vm);
+const lib = linker.load(soBytes, { name: 'ext' });
+
+lib.call('ext_run', 20, 22);
+lib.readText(lib.address('greeting')!);
+```
+
+Linked against a host runtime, an extension shares the host's heap, table and symbols, which is what
+a real extension ABI needs:
+
+```ts
+const host = vm.load(mainModuleBytes);
+const ext = createLinker(vm, { host }).load(extensionBytes);
+
+ext.call('ext_install'); // allocates from the host heap and calls back into it
+```
+
+Admission reads the library's declared demand rather than its size, because a library's `.bss`
+occupies no bytes in the file:
+
+```ts
+const { memorySize, tableSize, needed } = linker.inspect(soBytes);
+```
+
+Verified against zlib 1.3.2 built as an ordinary `-s SIDE_MODULE`: the interpreted library
+compresses, and node's own zlib reads the result back.
+
+Loading at request time buys reach rather than speed. Anything on a hot path belongs in the bundle.
+[ADVANCED_USAGE.md](ADVANCED_USAGE.md) has the cost model and the work shapes that suit it.
+
+## 📦 Declaring a Runtime
+
+```ts
+import { Burrow, defineRuntime } from '@drupflare/burrow';
+
+const php = defineRuntime({
+  name: 'php',
+  load: () => import('./runtimes/php.js'),
+  instantiate: async ({ loaded, io, lines }) => {
+    const mod = await loaded.PHPFactory({ stdout: lines(io.print) });
+    return { FS: mod.FS, callMain: (argv) => mod.callMain(argv) };
+  },
+  memory: { initial: 96 * 1024 * 1024, peak: 116 * 1024 * 1024 }
+});
+
+const burrow = new Burrow({ runtimes: [php] });
+
+await using sh = await burrow.session('php');
+await sh.evalText('<?php echo phpversion();');
+```
+
+`load` must be a thunk around a literal specifier, because esbuild cannot follow a computed one.
+
+## 🧮 Memory Budget
+
+`Budget` tracks linear memory per resident runtime against the isolate cap, refuses a boot that
+would not fit, and evicts least-recently-used residents first. Declared figures are corrected from
+observation after each run.
+
+A lease is the interlock: nothing leased is ever evicted, and a boot that cannot fit throws
+`BudgetError` rather than letting the isolate run out.
+
+## 🩺 Doctor
+
+```sh
+bunx burrow doctor ./runtimes/php.js
+```
+
+Scans a runtime for patterns that are fatal on Workers: `eval`, `new Function`, request-time wasm
+compilation, browser-only glue, and an unguarded `self.location` read. It reports findings and never
+a clean bill of health, because a source scan cannot prove the absence of a JIT. Exit code 0 means
+nothing known-fatal was seen.
+
+## 🧭 Subpath Exports
+
+| Export        | Contents                                |
+| ------------- | --------------------------------------- |
+| `.`           | the whole public surface                |
+| `./interpret` | `createInterpreter`, `WasmInterpreter`  |
+| `./dylink`    | `createLinker`, `readDylink`, `Library` |
+| `./registry`  | `Burrow`, leases                        |
+| `./session`   | `Session` and the `eval` surface        |
+| `./budget`    | `Budget`                                |
+| `./runtime`   | `defineRuntime`, `RuntimeSpec`          |
+| `./adapt`     | `lines`, `memoryFS`, `mkdirp`           |
+| `./doctor`    | `inspectSource`, `inspectWasm`          |
+| `./errors`    | every error type and its code           |
+
+## 🧪 Testing
+
+```sh
+bun run typecheck
+bun run test          # gate: unit and node
+bun run test:runtimes # real builds installed from npm
+bun run format:check
+```
+
+Every error carries a stable dotted `code`. Match on that, never on a message.
+
+## 📄 License
+
+MIT
