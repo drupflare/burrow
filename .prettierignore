@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+bun.lock
+.husky/
+typedoc/
+tests/fixtures/*.wasm
+src/vendor/
+.clang-format

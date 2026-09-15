@@ -1,0 +1,136 @@
+{
+	"name": "@drupflare/burrow",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "Execute arbitrary WebAssembly on Cloudflare Workers",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"burrow": "dist/bin/burrow.js"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./adapt": {
+			"types": "./dist/adapt.d.ts",
+			"import": "./dist/adapt.js"
+		},
+		"./budget": {
+			"types": "./dist/budget.d.ts",
+			"import": "./dist/budget.js"
+		},
+		"./doctor": {
+			"types": "./dist/doctor.d.ts",
+			"import": "./dist/doctor.js"
+		},
+		"./dylink": {
+			"types": "./dist/dylink.d.ts",
+			"import": "./dist/dylink.js"
+		},
+		"./errors": {
+			"types": "./dist/errors.d.ts",
+			"import": "./dist/errors.js"
+		},
+		"./interpret": {
+			"types": "./dist/interpret.d.ts",
+			"import": "./dist/interpret.js"
+		},
+		"./publish": {
+			"types": "./dist/publish.d.ts",
+			"import": "./dist/publish.js"
+		},
+		"./probe": {
+			"types": "./dist/probe.d.ts",
+			"import": "./dist/probe.js"
+		},
+		"./registry": {
+			"types": "./dist/registry.d.ts",
+			"import": "./dist/registry.js"
+		},
+		"./runtime": {
+			"types": "./dist/runtime.d.ts",
+			"import": "./dist/runtime.js"
+		},
+		"./session": {
+			"types": "./dist/session.d.ts",
+			"import": "./dist/session.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"sideEffects": false,
+	"files": [
+		"dist",
+		"LICENSE",
+		"README.md",
+		"ADVANCED_USAGE.md"
+	],
+	"scripts": {
+		"build": "tsc -p ./tsconfig.build.json",
+		"build:interp": "bash tools/build-interp.sh",
+		"typecheck": "tsc -p ./tsconfig.json --noEmit && tsc -p ./tsconfig.test.json --noEmit",
+		"test": "vitest run --project=unit --project=node",
+		"test:watch": "vitest --project=unit --project=node",
+		"test:coverage": "vitest run --project=unit --project=node --coverage",
+		"test:runtimes": "vitest run --project=runtimes",
+		"test:bench": "vitest run --project=bench",
+		"prettier": "prettier --write .",
+		"prettier:check": "prettier --check .",
+		"format": "bash format.sh && prettier --write .",
+		"format:check": "bash check-format.sh && prettier --check .",
+		"prepare": "husky",
+		"docs:build": "typedoc",
+		"docs:serve": "typedoc --watch",
+		"prepublishOnly": "bun run build"
+	},
+	"dependencies": {
+		"commander": "^15.0.0"
+	},
+	"devDependencies": {
+		"@bjorn3/browser_wasi_shim": "^0.4.2",
+		"@cloudflare/vitest-pool-workers": "^0.22.0",
+		"@cloudflare/workers-types": "^5.20260811.1",
+		"@gmitch215/bytebox": "^1.0.1",
+		"@ruby/3.4-wasm-wasi": "^2.10.1",
+		"@ruby/wasm-wasi": "^2.10.1",
+		"@types/node": "^26.4.0",
+		"@vitest/coverage-istanbul": "^4.1.11",
+		"husky": "^9.1.7",
+		"lint-staged": "^17.5.1",
+		"php-wasm": "0.1.0",
+		"prettier": "^3.9.6",
+		"prettier-plugin-organize-imports": "^4.3.0",
+		"prettier-plugin-sh": "^0.19.0",
+		"pyodide": "^314.0.7",
+		"quickjs-emscripten": "^0.32.0",
+		"typedoc": "^0.28.20",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0",
+		"wasmoon": "^1.16.0",
+		"wrangler": "^4.20.0"
+	},
+	"lint-staged": {
+		"*.{ts,js,sh,md}": "prettier --write",
+		"*.c": "clang-format --style=file -i"
+	},
+	"license": "MIT",
+	"author": "Gregory Mitchell <me@gmitch215.xyz>",
+	"homepage": "https://github.com/drupflare/burrow",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drupflare/burrow.git"
+	},
+	"bugs": {
+		"url": "https://github.com/drupflare/burrow/issues"
+	},
+	"keywords": [
+		"cloudflare",
+		"workers",
+		"wasm",
+		"webassembly",
+		"interpreter",
+		"wasm3",
+		"dynamic-linking"
+	]
+}

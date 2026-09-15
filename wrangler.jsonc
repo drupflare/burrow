@@ -1,0 +1,10 @@
+{
+	"name": "burrow-test",
+	"main": "tests/fixtures/host.ts",
+	"compatibility_date": "2026-08-22",
+	"compatibility_flags": ["nodejs_compat"],
+	"rules": [
+		{ "type": "CompiledWasm", "globs": ["**/*.wasm"], "fallthrough": true },
+		{ "type": "Data", "globs": ["**/*.bin"], "fallthrough": true }
+	]
+}

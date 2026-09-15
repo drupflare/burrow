@@ -1,0 +1,25 @@
+{
+	"plugins": ["prettier-plugin-organize-imports", "prettier-plugin-sh"],
+	"printWidth": 100,
+	"singleQuote": true,
+	"semi": true,
+	"useTabs": true,
+	"singleAttributePerLine": true,
+	"trailingComma": "none",
+	"endOfLine": "lf",
+	"overrides": [
+		{
+			"files": "*.jsonc",
+			"options": {
+				"parser": "json"
+			}
+		},
+		{
+			"files": "*.md",
+			"options": {
+				"useTabs": false,
+				"tabWidth": 2
+			}
+		}
+	]
+}

@@ -1,0 +1,29 @@
+* text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.wasm binary
+
+.github export-ignore
+.husky export-ignore
+.vscode export-ignore
+tests export-ignore
+tools export-ignore
+typedoc export-ignore
+coverage export-ignore
+.editorconfig export-ignore
+.gitattributes export-ignore
+.markdownlint.json export-ignore
+.prettierignore export-ignore
+.prettierrc export-ignore
+codecov.yml export-ignore
+renovate.json export-ignore
+tsconfig.json export-ignore
+tsconfig.build.json export-ignore
+tsconfig.test.json export-ignore
+typedoc.json export-ignore
+typedoc.sh export-ignore
+vitest.config.ts export-ignore
+wrangler.jsonc export-ignore
+CLAUDE.md export-ignore
