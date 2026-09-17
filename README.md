@@ -12,6 +12,7 @@ Execute arbitrary WebAssembly on Cloudflare Workers.
 - [📦 Declaring a Runtime](#-declaring-a-runtime)
 - [🧮 Memory Budget](#-memory-budget)
 - [🩺 Doctor](#-doctor)
+- [🔒 Security](#-security)
 - [🧭 Subpath Exports](#-subpath-exports)
 - [🧪 Testing](#-testing)
 - [📄 License](#-license)
@@ -170,6 +171,64 @@ Scans a runtime for patterns that are fatal on Workers: `eval`, `new Function`, 
 compilation, browser-only glue, and an unguarded `self.location` read. It reports findings and never
 a clean bill of health, because a source scan cannot prove the absence of a JIT. Exit code 0 means
 nothing known-fatal was seen.
+
+## 🔒 Security
+
+burrow runs code the deployment never saw. Treat a guest as untrusted unless you built it.
+
+**What the platform already handles.** A Worker isolate is ephemeral and has no filesystem, no
+subprocesses and no syscalls, so the persistence-shaped threats do not apply: there is nowhere for a
+miner to keep running, nothing for a trojan to install into, and no host to pivot to. A hostile
+guest gets one request.
+
+**What is left is the capabilities you hand over.** The guest can reach exactly as far as the host
+functions you supply. An import that fetches reaches the network; one that reads a binding reads
+your data; one that takes a pointer and a length can be handed any pointer. Supply the narrowest
+imports that do the job, validate arguments inside them rather than trusting the guest, and grant
+nothing you would not grant a browser extension.
+
+```ts
+const vm = await createInterpreter({ module: wasm3, maxMemoryBytes: 64 * 1024 * 1024 });
+
+const guest = vm.load(untrustedBytes, {
+  imports: {
+    env: {
+      // no fetch, no bindings, no clock the caller did not ask for
+      log: {
+        signature: 'v(ii)',
+        fn: (ptr, len) => record(guest.readText(ptr, Math.min(len, 4096)))
+      }
+    }
+  }
+});
+```
+
+**Set `maxMemoryBytes` for any guest you did not build.** Without it a guest can grow memory until
+the isolate dies, and an isolate OOM fails every request on that isolate rather than one.
+
+**Dynamic libraries linked into a host are not sandboxed from it.** They share one memory and one
+table, so a library can read and write everything the host holds and call anything the host can.
+That is what an extension ABI is, and it is also what a hostile library wants, so it has to be asked
+for:
+
+```ts
+createLinker(vm, { host, allowHostAccess: true }); // only for libraries you would run in-process
+createLinker(vm); // user-supplied: each library gets an address space of its own
+```
+
+Without a host, libraries resolve no symbols across each other and cannot reach the host's heap.
+
+**Guest memory is isolated; guest CPU is not.** Every guest access is bounds-checked, so a guest
+cannot read the interpreter or another guest. Nothing here stops a guest spinning, so the Worker CPU
+limit is what ends a runaway loop. Do not run untrusted guests inside a Durable Object you need to
+stay responsive.
+
+**Isolates are shared across requests.** Anything a previous request left in an interpreter's memory
+is readable by the next guest loaded into it. Create a fresh interpreter per tenant, or per request
+where the data warrants it.
+
+`burrow doctor` reports findings and never a clean bill of health, so it is a lint rather than a
+gate. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#security) has the threat model in full.
 
 ## 🧭 Subpath Exports
 

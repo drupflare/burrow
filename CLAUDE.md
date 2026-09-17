@@ -54,6 +54,12 @@ not transfer to another. What IS near-invariant is the interpreter's cost per lo
 terms, 2.2-2.7 ns once out of L1, which is why the ratio falls as the guest stalls more: a pointer
 chase reads 4.41x at 16 KiB and 1.01x at 64 MiB.
 
+**`D_cy` is a property of the interpreter's architecture, not of interpretation.** Wasmi 2.0 built
+natively interprets the same guests 1.11-2.06x faster than wasm3 built natively, so the shipped
+figure is wasm3's floor rather than the technique's. wasm3 is still the right choice here, because
+hosted as wasm32 the ranking inverts and every measured alternative is slower there. Do not write
+that any ratio is inherent to interpreting.
+
 Consequences worth carrying:
 
 - Latency-bound guests whose working set MISSES CACHE measure **1.14x on a deployed Worker**. The
@@ -78,7 +84,8 @@ Never quote one ratio. Quote the law and the guest's character.
 - Every behaviour change ships with its test in the same change, and one spec file per domain — fold
   a new case into the existing spec rather than adding a parallel `*-extra.spec.ts`.
 - No runtime is vendored. The consumer supplies it. The only wasm in the package is the interpreter,
-  checked in with the script that built it.
+  checked in with the script that built it. wasm3 is pinned by SHA and carries three burrow patches;
+  `tools/build-interp.sh` is the whole story and the binary is reproducible from it.
 
 ## Benchmark rules
 
@@ -117,7 +124,7 @@ bun run test:runtimes                # real builds from npm, slow and serial
 BURROW_BENCH=1 bun run test:bench    # the workload suite, never in the gate
 bun run format:check                 # clang-format over tools/interp/*.c AND prettier
 bun run build                        # tsc -p tsconfig.build.json -> dist/
-bun run build:interp                 # rebuild src/vendor/wasm3.wasm, needs emcc
+bun run build:interp                 # rebuild src/vendor/wasm3.wasm, needs emcc + wasm-tools
 bunx burrow doctor <runtime entry>   # Workers-safety scan
 bunx burrow probe <runtime entry>    # deploy, measure on the edge, tear down
 ```

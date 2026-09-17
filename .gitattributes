@@ -27,3 +27,4 @@ typedoc.sh export-ignore
 vitest.config.ts export-ignore
 wrangler.jsonc export-ignore
 CLAUDE.md export-ignore
+TECHNICAL_REPORT.md export-ignore

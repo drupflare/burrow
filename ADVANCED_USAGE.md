@@ -9,6 +9,7 @@ Reference material for the parts of burrow that need more than a signature to us
 - [Dynamic Linking](#dynamic-linking)
 - [The Performance Law](#the-performance-law)
 - [Memory Budgeting](#memory-budgeting)
+- [Security](#security)
 - [Things That Will Bite You](#things-that-will-bite-you)
 
 ## Runtime Status
@@ -16,17 +17,22 @@ Reference material for the parts of burrow that need more than a signature to us
 Two labels, and no third. **Verified** means a test in the `runtimes` lane installs a real build and
 drives it. **Not verified** means everything else, including builds that look like they should work.
 
-| Runtime | Version | Source               | Status       |
-| ------- | ------- | -------------------- | ------------ |
-| PHP     | 8.5     | `php-wasm`           | Verified     |
-| Lua     | 5.4     | `wasmoon`            | Verified     |
-| Python  | 3.x     | `pyodide`            | Verified     |
-| QuickJS | latest  | `quickjs-emscripten` | Verified     |
-| Java    | TeaVM   | `@gmitch215/bytebox` | Verified     |
-| Ruby    | 3.4     | `@ruby/wasm-wasi`    | Not verified |
+| Runtime | Version | Source               | Status   |
+| ------- | ------- | -------------------- | -------- |
+| PHP     | 8.5     | `php-wasm`           | Verified |
+| Lua     | 5.4     | `wasmoon`            | Verified |
+| Python  | 3.x     | `pyodide`            | Verified |
+| QuickJS | latest  | `quickjs-emscripten` | Verified |
+| Java    | TeaVM   | `@gmitch215/bytebox` | Verified |
+| Ruby    | 3.4     | `@ruby/wasm-wasi`    | Verified |
 
 QuickJS cannot carry session state: its entry point is a context per evaluation, and a context is
 its unit of isolation.
+
+Ruby is the only WASI build here. It has no `FS` object, because its filesystem is a preopen the
+host supplies, and its `_start` runs the interpreter to completion and cannot be re-entered, so the
+adapter enters through `vm.eval` instead. The WASI shim is `@bjorn3/browser_wasi_shim` rather than
+node's built-in, which workerd does not have.
 
 Java runs, but a class the build never compiled cannot be loaded. TeaVM is a whole-program
 closed-world AOT compiler, so an arriving class has no metadata to attach to and there is no
@@ -285,10 +291,31 @@ The hosting term concentrates in control flow, which is where V8's `call_indirec
 signature checks land on every dispatch.
 
 Two things follow. Compute-dense guests cannot be brought near native by tuning an interpreter,
-because the interpretation term dominates and closing it means compiling. And burrow is already
-close to what an in-wasm interpreter can do: the vendored wasm3 folds operand plumbing into its
-operands, and fuses compare-with-branch, compare-with-if and producer-with-`local.set`, so the
-obvious superinstruction work is already in the baseline.
+because the interpretation term dominates and closing it means compiling. And the obvious
+superinstruction work is already in the baseline: the vendored wasm3 folds operand plumbing into its
+operands, and fuses compare-with-branch, compare-with-if and producer-with-`local.set`.
+
+### What the vendored interpreter carries
+
+`src/vendor/wasm3.wasm` is not stock wasm3. `tools/build-interp.sh` pins the upstream revision by
+SHA, applies three changes, and commits the result:
+
+- a fold of a loop's affine induction update into its back edge, which upstream has no equivalent of
+- a retype of the dispatch table from `funcref` to a non-nullable typed function reference, so V8
+  stops emitting a signature check on every dispatch
+- a catalog of fused handlers, one per operation sequence in `tools/interp/fuse-catalog.json`, each
+  running its operations with no dispatch between them
+
+The catalog is data. Handlers are generated at build time from wasm3's own operation macros, so a
+fused handler has wasm3's semantics rather than a hand-written copy of them, and a guest is matched
+against the catalog after it compiles. Nothing is generated at request time.
+
+`Interpreter.fusedSequences` reports how many sequences the pass has replaced. Guests compile lazily,
+so it is 0 before anything runs and grows as functions are first called.
+
+Rebuilding needs `emcc`, `wasm-tools` and `node`. The typed table cannot come out of emcc, because
+LLVM has no `function-references` target feature and gives every C function pointer one shared
+`funcref` table, so that step is a post-link rewrite.
 
 Measured and rejected, so nobody re-buys them: skipping the memory bounds check is a net loss
 (geomean 1.038 and it gives up memory safety), and building the interpreter with LTO changes nothing
@@ -327,6 +354,97 @@ await using lease = await burrow.acquire('php');
 A boot that cannot fit because everything resident is leased throws `BudgetError` rather than
 evicting something in use. The failure to avoid is an isolate OOM, which takes down the whole
 Durable Object rather than one request.
+
+## Security
+
+burrow exists to run code the deployment never saw, which is arbitrary code execution by design.
+That is a legitimate thing to build: a Drupal host loading its own extensions, a CI service running
+user builds, a plugin surface where the operator publishes the plugins. It stops being legitimate
+the moment bytes arrive from somewhere you do not control and go straight into an interpreter
+holding your bindings.
+
+### What the platform already takes off the table
+
+Most of what "arbitrary code execution" usually means does not apply here, and it is worth being
+precise about why rather than inheriting the general fear.
+
+A Worker isolate is ephemeral and deliberately minimal. There is no filesystem, no `exec`, no
+subprocess, no syscall surface and no persistence between isolates. A guest cannot install anything,
+cannot survive its request, cannot open a port, and cannot reach the machine. The classic outcomes,
+a miner that keeps running, a trojan that persists, a foothold that gets pivoted from, have nowhere
+to live.
+
+The interpreter adds memory isolation on top. Every guest access is bounds-checked against the
+memory the interpreter gave it, so a guest cannot read the interpreter's own state, another guest's
+memory, or anything else in the isolate it was not handed.
+
+### What is actually exposed
+
+Four things, and all four are the consumer's to control.
+
+**The imports you supply.** A guest reaches exactly as far as its host functions and no further.
+This is the whole attack surface for a self-contained guest. An import that fetches is outbound
+network; an import that reads a binding is your data; an import taking a pointer and a length will
+be handed arbitrary pointers and lengths. Validate inside the import, clamp lengths, and do not pass
+the guest's numbers through to a binding unchecked.
+
+**Data already resident in the isolate.** Isolates are reused across requests. Anything a previous
+request left in an interpreter's linear memory is readable by the next guest loaded into it, because
+they share one address space by construction. Where that matters, create an interpreter per tenant
+or per request rather than caching one.
+
+**Memory.** Without a ceiling a guest can grow until the isolate dies, and an isolate OOM fails every
+request on that isolate rather than the one that caused it.
+
+```ts
+const vm = await createInterpreter({ module: wasm3, maxMemoryBytes: 64 * 1024 * 1024 });
+```
+
+wasm3 clamps rather than refuses, so the behaviour is specific and worth knowing: `memory.grow`
+answers success and `memory.size` reports the larger size, but only memory up to the ceiling is
+backed, and the first access past it traps. Memory safety holds. What the guest is told about its
+own size does not, so a guest that checks `memory.grow` believes it and traps later. The trade is
+deliberate: a trapped guest fails one request, an isolate OOM fails all of them.
+
+**CPU.** Nothing here meters instructions. A guest can spin, and the Worker CPU limit is what ends
+it. Do not run untrusted guests inside a Durable Object that needs to stay responsive for anything
+else.
+
+### Dynamic libraries are the sharp edge
+
+Everything above assumes a self-contained guest. A library linked into a **host** is a different
+posture entirely, and it is the one thing in this package that must be opted into:
+
+```ts
+createLinker(vm, { host, allowHostAccess: true });
+```
+
+Without the flag the linker throws `burrow.dylink.host_access_denied`.
+
+The reason is that a library placed in a host's address space is not sandboxed from that host. They
+share one linear memory, so the library can read and write every byte the host holds, including
+whatever a previous request left there. They share one table, so the library can call anything the
+host can. Its relocations are addresses the linker hands it. **This is not a weakness in the
+implementation; it is what a dynamic linking ABI is.** A PHP extension is supposed to be able to
+reach into the PHP runtime, and nothing distinguishes that from a hostile library doing the same.
+
+So the rule is the same one you would apply to a native `.so`: load it into your runtime only if you
+would run it in-process anyway. For anything user-supplied, omit `host`. Each library then gets an
+address space of its own, resolves no symbols across libraries, and cannot reach the host's heap.
+
+### Etiquette
+
+- Treat a guest as untrusted unless you built it, and keep the trusted and untrusted paths separate
+  in your own code rather than deciding per request.
+- Grant the narrowest imports that do the job. The absence of an import is the only unbypassable
+  control in this package.
+- Set `maxMemoryBytes` on anything you did not build.
+- Do not pass `allowHostAccess` for user-supplied libraries, and say in your own docs which of your
+  libraries are trusted.
+- Use a fresh interpreter per trust boundary. Sharing one is sharing an address space.
+- `burrow doctor` reports findings and never a clean bill of health. It is a lint on runtimes you are
+  choosing, not a gate on guests you are running, and it cannot prove the absence of anything.
+- Log what a guest is and where it came from. An ephemeral isolate leaves no trace on its own.
 
 ## Things That Will Bite You
 
