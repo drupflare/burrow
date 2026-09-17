@@ -1,0 +1,194 @@
+diff -ur a/m3_compile.c b/m3_compile.c
+--- a/m3_compile.c	2026-09-15 19:43:46
++++ b/m3_compile.c	2026-09-15 19:44:20
+@@ -61,9 +61,12 @@
+ static inline
+ void InvalidateFold (IM3Compilation o)
+ {
++#if d_m3FoldLoopBackEdge
++    o->loopFoldPC = NULL;
++#endif
+ #if d_m3FoldSetLocal
+     o->foldPatchPC = NULL;
+-#else
++#elif !d_m3FoldLoopBackEdge
+     (void)o;
+ #endif
+ }
+@@ -1634,6 +1637,11 @@
+ _       (FindReferencedLocalWithinCurrentBlock(o, &preserveSlot, localSlot));  // preserve will be different than local, if referenced
+ 
+         bool folded = false;
++#if d_m3FoldLoopBackEdge
++        pc_t       latchPC     = NULL;
++        m3opcode_t latchOpcode = 0;
++        u8         latchForm   = 0;
++#endif
+ 
+ #if d_m3FoldSetLocal
+         // destination folding: when the value was produced by the immediately preceding op (nothing
+@@ -1643,6 +1651,11 @@
+             IM3Operation foldOp = GetFoldOp(o->foldOpcode, o->foldForm);
+ 
+             if (foldOp) {
++#if d_m3FoldLoopBackEdge
++                latchPC     = o->foldPatchPC;
++                latchOpcode = o->foldOpcode;
++                latchForm   = o->foldForm;
++#endif
+                 *(IM3Operation*)o->foldPatchPC = foldOp;     // retro-patch the producer
+                 EmitSlotOffset(o, localSlot);                  // append its destination
+                 InvalidateFold(o);
+@@ -1660,6 +1673,17 @@
+             // wants a register reload the slot this op just stored to.
+             if (i_opcode == c_waOp_teeLocal) {
+ _               (PushRegister(o, type));
++
++#if d_m3FoldLoopBackEdge
++                // the value is now in the local's slot AND on top in the register: a br_if
++                // closing a loop can absorb the whole thing
++                if (latchPC) {
++                    o->loopFoldPC         = latchPC;
++                    o->loopFoldOpcode     = latchOpcode;
++                    o->loopFoldForm       = latchForm;
++                    o->loopFoldStackIndex = (u16) GetStackTopIndex(o);
++                }
++#endif
+             }
+         } else {
+             if (preserveSlot == localSlot) {
+@@ -1904,6 +1928,31 @@
+ 
+ #endif // d_m3HasExceptionHandling
+ 
++#if d_m3FoldLoopBackEdge
++// when a destination-folded add or subtract wrote a local's slot and its result is still on top
++// in _r0, return the variant that also tests it and takes the loop's back edge
++static
++IM3Operation GetLoopFoldOp (IM3Compilation o)
++{
++    if (not o->loopFoldPC or o->loopFoldForm >= 4) {
++        return NULL;
++    }
++
++    if (not IsStackTopInRegister(o) or GetStackTopIndex(o) != (i16)o->loopFoldStackIndex) {
++        return NULL;
++    }
++
++    switch (o->loopFoldOpcode) {
++    case 0x6a:  // i32.add
++        return o->loopFoldForm == 0 ? op_i32_Add_rs_fl      : (o->loopFoldForm == 2 ? op_i32_Add_ss_fl      : NULL);
++    case 0x6b:  // i32.sub
++        return o->loopFoldForm == 0 ? op_i32_Subtract_rs_fl : (o->loopFoldForm == 2 ? op_i32_Subtract_ss_fl : NULL);
++    default:
++        return NULL;
++    }
++}
++#endif // d_m3FoldLoopBackEdge
++
+ #if d_m3FuseBranch
+ // when the pending fold candidate is a compare whose result sits on top in _r0, return the fused
+ // variant that absorbs an immediately following br_if (i_isIf false) or if (i_isIf true)
+@@ -1968,6 +2017,20 @@
+ 
+                 *jumpTo = GetPC(o);
+             } else {
++#if d_m3FoldLoopBackEdge
++                IM3Operation loopFoldOp = GetLoopFoldOp(o);
++
++                if (loopFoldOp) {
++                    // absorb the branch into the update that produced the condition
++                    *(IM3Operation*)o->loopFoldPC = loopFoldOp;
++                    InvalidateFold(o);
++
++_                   (PopType(o, c_m3Type_i32));       // consumed inside the folded op
++
++                    EmitPointer(o, scope->pc);
++                    goto _catch;
++                }
++#endif
+                 // move the condition to a register
+ _               (CopyStackTopToRegister(o, false));
+ _               (PopType(o, c_m3Type_i32));
+diff -ur a/m3_compile.h b/m3_compile.h
+--- a/m3_compile.h	2026-09-15 19:43:46
++++ b/m3_compile.h	2026-09-15 19:44:20
+@@ -197,6 +197,16 @@
+     // the last emitted op, when it is a candidate for local.set destination folding.
+     // foldPatchPC is NULL whenever anything was emitted (or a branch target captured) since.
+     pc_t       foldPatchPC;                // address of the candidate's op word in the code stream
++#endif
++#if d_m3FoldLoopBackEdge
++    // an add or subtract already folded into a local's slot by a tee, its result still in the
++    // register: a br_if closing a loop can take the update, the test and the branch together
++    pc_t       loopFoldPC;
++    m3opcode_t loopFoldOpcode;
++    u16        loopFoldStackIndex;
++    u8         loopFoldForm;
++#endif
++#if d_m3FoldSetLocal
+     m3opcode_t foldOpcode;
+     u16        foldStackIndex;             // stack index of the candidate's pushed result
+     u8         foldForm;                   // operand-form index the candidate was emitted with
+diff -ur a/m3_config.h b/m3_config.h
+--- a/m3_config.h	2026-09-15 19:43:46
++++ b/m3_config.h	2026-09-15 19:44:20
+@@ -223,6 +223,14 @@
+ #ifndef d_m3FuseBranch
+ #  define d_m3FuseBranch                       1       // fuse a compare with an immediately following
+ #endif                                                 // br_if/if into one op (needs d_m3FoldSetLocal)
++#ifndef d_m3FoldLoopBackEdge
++#  define d_m3FoldLoopBackEdge                 1       // fold an affine local update into the br_if
++#endif                                                 // that closes the loop testing it
++#if d_m3FoldLoopBackEdge && !d_m3FoldSetLocal
++#  undef d_m3FoldLoopBackEdge
++#  define d_m3FoldLoopBackEdge                 0       // the candidate tracking lives in the fold machinery
++#endif
++
+ #if d_m3FuseBranch && !d_m3FoldSetLocal
+ #  undef d_m3FuseBranch
+ #  define d_m3FuseBranch                       0       // the fusion candidate tracking lives in the fold machinery
+diff -ur a/m3_exec.h b/m3_exec.h
+--- a/m3_exec.h	2026-09-15 19:43:46
++++ b/m3_exec.h	2026-09-15 19:44:20
+@@ -381,6 +381,40 @@
+ d_m3FoldOp_f           (f64, Divide,       M3_OPER_A, /, canon_nan_f64)
+ #endif
+ 
++#  if d_m3FoldLoopBackEdge
++// A counted loop closes on "advance the local, test it, branch back". The advance is already
++// a destination-folded op writing the local's slot, and the branch reads the same value out of
++// the register, so one operation can do all three. The back edge returns the loop id to
++// op_Loop's own do-while rather than jumping, which is why it needs its own variants.
++#    define d_m3FoldLoopOp(TYPE, NAME, OP, ...)         \
++d_m3Op(TYPE##_##NAME##_rs_fl)                           \
++{                                                       \
++    TYPE   operand = slot (TYPE);                       \
++    TYPE * dest    = slot_ptr (TYPE);                   \
++    void * loopId  = immediate (void*);                 \
++    TYPE   result;                                      \
++    OP((result), operand, ((TYPE) _r0), ##__VA_ARGS__); \
++    * dest = result;  _r0 = result;                     \
++    if (result) return loopId;                          \
++    nextOp ();                                          \
++}                                                       \
++d_m3Op(TYPE##_##NAME##_ss_fl)                           \
++{                                                       \
++    TYPE   operand2 = slot (TYPE);                      \
++    TYPE   operand1 = slot (TYPE);                      \
++    TYPE * dest     = slot_ptr (TYPE);                  \
++    void * loopId   = immediate (void*);                \
++    TYPE   result;                                      \
++    OP((result), operand1, operand2, ##__VA_ARGS__);    \
++    * dest = result;  _r0 = result;                     \
++    if (result) return loopId;                          \
++    nextOp ();                                          \
++}
++
++d_m3FoldLoopOp(i32, Add,      M3_FUNC, OP_ADD_32)
++d_m3FoldLoopOp(i32, Subtract, M3_FUNC, OP_SUB_32)
++#  endif // d_m3FoldLoopBackEdge
++
+ #endif // d_m3FoldSetLocal
+ 
+ #if d_m3HasFloat

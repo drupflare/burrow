@@ -1,0 +1,23 @@
+--- a/m3_compile.c
++++ b/m3_compile.c
+@@ -11,6 +11,10 @@
+ #include "m3_env.h"
+ #include "m3_compile.h"
+ #include "m3_exec.h"
++
++#if d_m3Fuse
++void burrow_fuse_record (pc_t i_pc, void* i_op);
++#endif
+ #include "m3_exception.h"
+ #include "m3_info.h"
+ #include "m3_validate.h"
+@@ -97,6 +101,9 @@
+             EmitMappingEntry(o->page, (u32)(o->lastOpcodeStart - o->module->wasmStart));
+ #endif // d_m3RecordBacktraces
+             EmitWord(o->page, i_operation);
++#if d_m3Fuse
++            burrow_fuse_record (GetPagePC (o->page) - 1, (void*) i_operation);
++#endif
+         }
+     }
+ 

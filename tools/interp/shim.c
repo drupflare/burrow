@@ -17,6 +17,21 @@
 #include <stdint.h>
 #include "wasm3.h"
 #include "m3_env.h"
+#if d_m3Fuse
+/* defined in m3_fuse.h, which m3_compile.c includes because the opcodes live in that unit */
+extern unsigned burrow_fuse_apply(void);
+extern void burrow_fuse_reset(void);
+extern unsigned burrow_fuse_count(void);
+#endif
+
+/* how many operation sequences the fusion pass has replaced; 0 means the pass never fired */
+__attribute__((export_name("burrow_fused"))) int burrow_fused(void) {
+#if d_m3Fuse
+	return (int) burrow_fuse_count();
+#else
+	return 0;
+#endif
+}
 
 #define MAX_MODULES 32
 #define MAX_TRAMPOLINES 512
@@ -32,6 +47,10 @@ static IM3Module modules[MAX_MODULES];
 static int module_count;
 static char errbuf[512];
 static int trampolines_used;
+static IM3Function reserved[MAX_TRAMPOLINES];
+static IM3Module reserved_in[MAX_TRAMPOLINES];
+/* non-NULL means the id is live; both burrow_link and burrow_reserve claim one, unload frees it */
+static IM3Module trampoline_owner[MAX_TRAMPOLINES];
 
 __attribute__((export_name("burrow_alloc"))) void* burrow_alloc(int n) {
 	return malloc((size_t) n);
@@ -59,26 +78,53 @@ static IM3Module at(int index) {
 	return (index < 0 || index >= module_count) ? NULL : modules[index];
 }
 
-__attribute__((export_name("burrow_init"))) int burrow_init(int stack_bytes) {
+/*
+ * memory_limit caps every guest's linear memory in bytes; 0 leaves it uncapped.
+ *
+ * Reaches into M3Runtime because wasm3 exposes no setter. The cap is what stops a hostile or merely
+ * runaway guest from growing until the isolate dies, which takes the whole Durable Object with it
+ * rather than one request.
+ */
+__attribute__((export_name("burrow_init"))) int burrow_init(int stack_bytes, int memory_limit) {
 	errbuf[0] = 0;
+	// re-initialising used to strand the previous runtime and every module in it
+	if (rt) m3_FreeRuntime(rt);
+#if d_m3Fuse
+	// the recorded stream points into code pages the freed runtime owned
+	burrow_fuse_reset();
+#endif
 	module_count = 0;
 	trampolines_used = 0;
+	memset(modules, 0, sizeof(modules));
+	memset(reserved, 0, sizeof(reserved));
+	memset(reserved_in, 0, sizeof(reserved_in));
+	memset(trampoline_owner, 0, sizeof(trampoline_owner));
 	if (!env) env = m3_NewEnvironment();
 	if (!env) return say("no environment", -1);
 	rt = m3_NewRuntime(env, (uint32_t) stack_bytes, NULL);
 	if (!rt) return say("no runtime", -2);
+	if (memory_limit > 0) rt->memoryLimit = (uint32_t) memory_limit;
 	return 0;
+}
+
+/* the lowest free module slot, reusing one an unload emptied before taking a fresh one */
+static int free_slot(void) {
+	for (int i = 0; i < module_count; ++i) {
+		if (!modules[i]) return i;
+	}
+	return module_count < MAX_MODULES ? module_count++ : -1;
 }
 
 /* parses a module without instantiating it, answering its index or a negative error */
 __attribute__((export_name("burrow_parse"))) int burrow_parse(uint8_t* bytes, int len) {
 	errbuf[0] = 0;
-	if (module_count >= MAX_MODULES) return say("too many modules", -1);
+	int index = free_slot();
+	if (index < 0) return say("too many modules", -1);
 	IM3Module mod;
 	M3Result r = m3_ParseModule(env, &mod, bytes, (uint32_t) len);
 	if (r) return fail(r, -2);
-	modules[module_count] = mod;
-	return module_count++;
+	modules[index] = mod;
+	return index;
 }
 
 /* instantiates a parsed module: resolves its imports, backs its memory and runs its initializers */
@@ -192,6 +238,17 @@ static const void* trampoline(IM3Runtime r, IM3ImportContext ctx, uint64_t* sp, 
 	return host_call(id, sp, mem) ? m3Err_trapAbort : m3Err_none;
 }
 
+static int claim_trampoline(IM3Module mod) {
+	for (int i = 0; i < MAX_TRAMPOLINES; ++i) {
+		if (!trampoline_owner[i]) {
+			trampoline_owner[i] = mod;
+			if (i >= trampolines_used) trampolines_used = i + 1;
+			return i;
+		}
+	}
+	return -1;
+}
+
 /*
  * Installs a host function for an import, answering the id JavaScript will be called back with.
  *
@@ -203,12 +260,14 @@ __attribute__((export_name("burrow_link"))) int burrow_link(
 	errbuf[0] = 0;
 	IM3Module mod = at(module_index);
 	if (!mod) return say("bad module", -1);
-	if (trampolines_used >= MAX_TRAMPOLINES) return say("too many linked imports", -2);
-	int id = trampolines_used;
+	int id = claim_trampoline(mod);
+	if (id < 0) return say("too many linked imports", -2);
 	M3Result r =
 		m3_LinkRawFunctionEx(mod, module_name, field, sig, trampoline, (const void*) (intptr_t) id);
-	if (r) return fail(r, -3);
-	trampolines_used++;
+	if (r) {
+		trampoline_owner[id] = NULL;
+		return fail(r, -3);
+	}
 	return id;
 }
 
@@ -216,9 +275,6 @@ __attribute__((export_name("burrow_link"))) int burrow_link(
 extern M3Result CompileRawFunction(
 	IM3Module io_module, IM3Function io_function, const void* i_function, const void* i_userdata
 );
-
-static IM3Function reserved[MAX_TRAMPOLINES];
-static IM3Module reserved_in[MAX_TRAMPOLINES];
 
 /*
  * Claims a function import for the host before the module is instantiated, answering its id.
@@ -234,14 +290,14 @@ __attribute__((export_name("burrow_reserve"))) int burrow_reserve(
 	errbuf[0] = 0;
 	IM3Module mod = at(module_index);
 	if (!mod) return say("bad module", -1);
-	if (trampolines_used >= MAX_TRAMPOLINES) return say("too many linked imports", -2);
 
 	for (u32 i = 0; i < mod->numFunctions; ++i) {
 		IM3Function f = &mod->functions[i];
 		if (!f->import.moduleUtf8 || !f->import.fieldUtf8) continue;
 		if (strcmp(f->import.moduleUtf8, module_name) != 0) continue;
 		if (strcmp(f->import.fieldUtf8, field) != 0) continue;
-		int id = trampolines_used++;
+		int id = claim_trampoline(mod);
+		if (id < 0) return say("too many linked imports", -2);
 		reserved[id] = f;
 		reserved_in[id] = mod;
 		detach(&f->import);
@@ -262,6 +318,11 @@ __attribute__((export_name("burrow_bind"))) int burrow_bind(int id) {
 
 /* calls an export by name with up to four i32 arguments, answering its i64-widened result */
 static int64_t call_function(IM3Function f, int32_t a0, int32_t a1, int32_t a2, int32_t a3) {
+#if d_m3Fuse
+	// wasm3 compiles a function on first call, so fusing before each call catches what the last one
+	// emitted; the pass only walks operations recorded since it last ran
+	burrow_fuse_apply();
+#endif
 	const void* args[4] = {&a0, &a1, &a2, &a3};
 	uint32_t n = m3_GetArgCount(f);
 	if (n > 4) return say("more than four arguments", -2);
@@ -400,6 +461,74 @@ __attribute__((export_name("burrow_table_put"))) int burrow_table_put(
 	M3Result r = m3_FindFunctionIn(&f, func_module, name);
 	if (r) return fail(r, -4);
 	table->elements[slot] = f;
+	return 0;
+}
+
+/*
+ * Empties a run of table slots.
+ *
+ * Needed before unloading: a side module writes its functions into the HOST's table, and wasm3's
+ * own teardown only stops a module freeing a table it borrowed, it does not clear the entries it
+ * wrote. Freeing a module whose functions are still reachable through someone else's table leaves
+ * them dangling and callable.
+ */
+__attribute__((export_name("burrow_table_clear"))) int burrow_table_clear(
+	int owner, int slot, int count
+) {
+	errbuf[0] = 0;
+	IM3Module table_module = at(owner);
+	if (!table_module) return say("bad module", -1);
+	if (!table_module->numTables) return say("module has no table", -2);
+	IM3Table table = table_module->tables[0];
+	if (slot < 0 || count < 0 || (u32) (slot + count) > table->size) {
+		return say("table slot out of range", -3);
+	}
+	for (int i = 0; i < count; ++i) table->elements[slot + i] = NULL;
+	return 0;
+}
+
+/*
+ * Releases a module: unlinks it from the runtime, frees its structures and empties its slot.
+ *
+ * m3_LoadModule transfers ownership to the runtime and the header forbids m3_FreeModule afterwards,
+ * because the runtime's list would dangle. Unlinking first is what makes the free legal, and it is
+ * the same two-phase order Runtime_Release uses: drop the borrowed memory and table pointers so
+ * m3_FreeModule cannot free a host's, then free.
+ *
+ * The caller must already have cleared any table slots pointing into this module; see
+ * burrow_table_clear. Compiled code pages are NOT reclaimed - wasm3 gates that on
+ * d_m3EnableCodePageRefCounting, which upstream leaves off - so they stay with the runtime.
+ */
+__attribute__((export_name("burrow_unload"))) int burrow_unload(int index) {
+	errbuf[0] = 0;
+	IM3Module mod = at(index);
+	if (!mod) return say("bad module", -1);
+
+	for (IM3Module* link = &rt->modules; *link; link = &(*link)->next) {
+		if (*link == mod) {
+			*link = mod->next;
+			break;
+		}
+	}
+
+	for (u32 i = 0; i < mod->numMemories; ++i) {
+		if (mod->memories[i] && mod->memories[i]->owner != mod) mod->memories[i] = NULL;
+	}
+	for (u32 i = 0; i < mod->numTables; ++i) {
+		if (mod->tables[i] && mod->tables[i]->owner != mod) mod->tables[i] = NULL;
+	}
+
+	if (rt->lastCalled && rt->lastCalled->module == mod) rt->lastCalled = NULL;
+
+	for (int i = 0; i < trampolines_used; ++i) {
+		if (trampoline_owner[i] != mod) continue;
+		trampoline_owner[i] = NULL;
+		reserved[i] = NULL;
+		reserved_in[i] = NULL;
+	}
+
+	m3_FreeModule(mod);
+	modules[index] = NULL;
 	return 0;
 }
 
