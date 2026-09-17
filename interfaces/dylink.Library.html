@@ -22,7 +22,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 </div></div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">Library</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#guest">guest</a><span class="tsd-signature-symbol">:</span> <a href="interpret.Guest.html" class="tsd-signature-type tsd-kind-interface">Guest</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#info">info</a><span class="tsd-signature-symbol">:</span> <a href="dylink.DylinkInfo.html" class="tsd-signature-type tsd-kind-interface">DylinkInfo</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#memorybase">memoryBase</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#tablebase">tableBase</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#address-1">address</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#call-1">call</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <span class="tsd-signature-symbol">...</span><span class="tsd-kind-parameter">args</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#has-1">has</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#pointer-1">pointer</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#read-1">read</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">ptr</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">length</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#readtext-1">readText</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">ptr</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">length</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#readu32-1">readU32</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">ptr</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#write-1">write</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">ptr</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">data</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#writeu32-1">writeU32</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">ptr</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">,</span> <span class="tsd-kind-parameter">value</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L88">src/dylink.ts:88</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L88">src/dylink.ts:88</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -57,35 +57,35 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <div class="tsd-comment tsd-typography"><p>the underlying guest module, for the raw interpreter surface</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L98">src/dylink.ts:98</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L98">src/dylink.ts:98</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="info"><code class="tsd-tag">Readonly</code><span>info</span><a href="#info" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">info</span><span class="tsd-signature-symbol">:</span> <a href="dylink.DylinkInfo.html" class="tsd-signature-type tsd-kind-interface">DylinkInfo</a></div>
 <div class="tsd-comment tsd-typography"><p>what <code>dylink.0</code> declared</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L92">src/dylink.ts:92</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L92">src/dylink.ts:92</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="memorybase"><code class="tsd-tag">Readonly</code><span>memory<wbr/>Base</span><a href="#memorybase" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">memoryBase</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>where the library's static data was placed</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L94">src/dylink.ts:94</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L94">src/dylink.ts:94</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="name"><code class="tsd-tag">Readonly</code><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">name</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>the name the library was loaded under, which is also its cache key</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L90">src/dylink.ts:90</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L90">src/dylink.ts:90</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="tablebase"><code class="tsd-tag">Readonly</code><span>table<wbr/>Base</span><a href="#tablebase" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">tableBase</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>the first table slot the library's element segments filled</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L96">src/dylink.ts:96</a></li></ul></aside></section></section></details>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L96">src/dylink.ts:96</a></li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -103,7 +103,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">name</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">null</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L108">src/dylink.ts:108</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L108">src/dylink.ts:108</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="call"><span>call</span><a href="#call" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -123,7 +123,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <h4 class="tsd-anchor-link" id="throws">Throws<a href="#throws" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p>when the library exports no such function</p>
 </div></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L106">src/dylink.ts:106</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L106">src/dylink.ts:106</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="has"><span>has</span><a href="#has" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -138,7 +138,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">name</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">boolean</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L100">src/dylink.ts:100</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L100">src/dylink.ts:100</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="pointer"><span>pointer</span><a href="#pointer" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -153,7 +153,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">name</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L110">src/dylink.ts:110</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L110">src/dylink.ts:110</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="read"><span>read</span><a href="#read" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -169,7 +169,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">length</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Uint8Array</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L112">src/dylink.ts:112</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L112">src/dylink.ts:112</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="readtext"><span>read<wbr/>Text</span><a href="#readtext" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -185,7 +185,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">length</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">string</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L114">src/dylink.ts:114</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L114">src/dylink.ts:114</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="readu32"><span>read<wbr/>U32</span><a href="#readu32" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -200,7 +200,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">ptr</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">number</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L118">src/dylink.ts:118</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L118">src/dylink.ts:118</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="write"><span>write</span><a href="#write" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -216,7 +216,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">data</span>: <span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L116">src/dylink.ts:116</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L116">src/dylink.ts:116</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="writeu32"><span>write<wbr/>U32</span><a href="#writeu32" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -232,7 +232,7 @@ when one was given, so a pointer crossing the boundary means the same thing on b
 <li><span><span class="tsd-kind-parameter">value</span>: <span class="tsd-signature-type">number</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L120">src/dylink.ts:120</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L120">src/dylink.ts:120</a></li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

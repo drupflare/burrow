@@ -23,7 +23,7 @@ artifact and a check against the byte length lets it straight through.</p>
 </div></div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">DylinkInfo</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#memoryalignment">memoryAlignment</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#memorysize">memorySize</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#needed">needed</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#tablealignment">tableAlignment</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#tablesize">tableSize</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L55">src/dylink.ts:55</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L55">src/dylink.ts:55</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -46,35 +46,35 @@ artifact and a check against the byte length lets it straight through.</p>
 <div class="tsd-comment tsd-typography"><p>alignment of that region, as a power of two</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L59">src/dylink.ts:59</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L59">src/dylink.ts:59</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="memorysize"><span>memory<wbr/>Size</span><a href="#memorysize" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">memorySize</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>bytes of static data and bss the library needs, which <code>__memory_base</code> has to point at</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L57">src/dylink.ts:57</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L57">src/dylink.ts:57</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="needed"><span>needed</span><a href="#needed" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">needed</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">[]</span></div>
 <div class="tsd-comment tsd-typography"><p>libraries this one was linked against, in the order the linker recorded them</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L65">src/dylink.ts:65</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L65">src/dylink.ts:65</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="tablealignment"><span>table<wbr/>Alignment</span><a href="#tablealignment" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">tableAlignment</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>alignment of the table region, as a power of two</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L63">src/dylink.ts:63</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L63">src/dylink.ts:63</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="tablesize"><span>table<wbr/>Size</span><a href="#tablesize" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">tableSize</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>table slots the library's own element segments fill</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L61">src/dylink.ts:61</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/a074b73616a02cd36dd857a638828eb09249e666/src/dylink.ts#L61">src/dylink.ts:61</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

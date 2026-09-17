@@ -443,9 +443,9 @@ user builds, a plugin surface where the operator publishes the plugins. It stops
 the moment bytes arrive from somewhere you do not control and go straight into an interpreter
 holding your bindings.</p>
 <h3 id="what-the-platform-already-takes-off-the-table" class="tsd-anchor-link">What the platform already takes off the table<a href="#what-the-platform-already-takes-off-the-table" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>Most of what &quot;arbitrary code execution&quot; usually means does not apply here, and it is worth being
-precise about why rather than inheriting the general fear.</p>
-<p>A Worker isolate is ephemeral and deliberately minimal. There is no filesystem, no <code>exec</code>, no
+<p>Most of what &quot;arbitrary code execution&quot; usually means does not apply here, and the reasons are
+specific.</p>
+<p>A Worker isolate is ephemeral and minimal. There is no filesystem, no <code>exec</code>, no
 subprocess, no syscall surface and no persistence between isolates. A guest cannot install anything,
 cannot survive its request, cannot open a port, and cannot reach the machine. The classic outcomes,
 a miner that keeps running, a trojan that persists, a foothold that gets pivoted from, have nowhere
