@@ -8,3 +8,5 @@ typedoc/
 tests/fixtures/*.wasm
 src/vendor/
 .clang-format
+*.inc
+.remember/

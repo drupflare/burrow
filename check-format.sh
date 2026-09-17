@@ -27,12 +27,12 @@ if [[ $# -gt 0 ]]; then
 	files=("$@")
 else
 	if command -v mapfile > /dev/null 2>&1; then
-		mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.c' '*.cpp' '*.h' '*.hpp')
+		mapfile -t files < <(git ls-files --cached --others --exclude-standard '*.c' '*.cpp' '*.h' '*.hpp' '*.inc')
 	else
 		files=()
 		while IFS= read -r line; do
 			files+=("$line")
-		done < <(git ls-files --cached --others --exclude-standard '*.c' '*.cpp' '*.h' '*.hpp')
+		done < <(git ls-files --cached --others --exclude-standard '*.c' '*.cpp' '*.h' '*.hpp' '*.inc')
 	fi
 fi
 
