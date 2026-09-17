@@ -10,6 +10,14 @@ on:
         type: string
         description: 'Suffix to append to the version'
         default: ''
+      skip_npm:
+        type: boolean
+        description: 'Skip npmjs'
+        default: false
+      skip_github_npm:
+        type: boolean
+        description: 'Skip GitHub Packages (npm)'
+        default: false
 
 jobs:
   release:
@@ -109,13 +117,13 @@ jobs:
           bun run typecheck
           bun run test
       - name: Set up Node for npm
-        if: steps.suffix.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm
         uses: actions/setup-node@v7
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
       - name: Check the Token Is Present
-        if: steps.suffix.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -124,7 +132,7 @@ jobs:
             exit 1
           fi
       - name: Check Whether the Version Is Already on the Registry
-        if: steps.suffix.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm
         id: published
         run: |
           VERSIONS=$(npm view "$PACKAGE" versions --json 2>/dev/null || echo '[]')
@@ -135,7 +143,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       - name: Publish
-        if: steps.suffix.outputs.skip == 'false' && steps.published.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm && steps.published.outputs.skip == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public --provenance
@@ -144,20 +152,22 @@ jobs:
         run: |
           echo "## npm publish" >> $GITHUB_STEP_SUMMARY
           echo "- Package: \`${PACKAGE}@${VERSION}\`" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.published.outputs.skip }}" = "true" ]; then
+          if [ "${{ inputs.skip_npm }}" = "true" ]; then
+            echo "- Result: skipped, skip_npm was set" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.published.outputs.skip }}" = "true" ]; then
             echo "- Result: skipped, already on the registry" >> $GITHUB_STEP_SUMMARY
           else
             echo "- Result: published with provenance" >> $GITHUB_STEP_SUMMARY
           fi
       - name: Set up Node for GitHub Packages
-        if: steps.suffix.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_github_npm
         uses: actions/setup-node@v7
         with:
           node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@drupflare'
       - name: Check Whether the Version Is Already on GitHub Packages
-        if: steps.suffix.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_github_npm
         id: published_gh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -170,7 +180,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
       - name: Publish to GitHub Packages
-        if: steps.suffix.outputs.skip == 'false' && steps.published_gh.outputs.skip == 'false'
+        if: steps.suffix.outputs.skip == 'false' && !inputs.skip_github_npm && steps.published_gh.outputs.skip == 'false'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm publish --access public
@@ -179,7 +189,9 @@ jobs:
         run: |
           echo "## GitHub Packages" >> $GITHUB_STEP_SUMMARY
           echo "- Package: \`${PACKAGE}@${VERSION}\`" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ steps.published_gh.outputs.skip }}" = "true" ]; then
+          if [ "${{ inputs.skip_github_npm }}" = "true" ]; then
+            echo "- Result: skipped, skip_github_npm was set" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.published_gh.outputs.skip }}" = "true" ]; then
             echo "- Result: skipped, already on GitHub Packages" >> $GITHUB_STEP_SUMMARY
           else
             echo "- Result: published" >> $GITHUB_STEP_SUMMARY
