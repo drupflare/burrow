@@ -34,3 +34,49 @@ jobs:
         run: bun run test
       - name: Build
         run: bun run build
+
+  snapshot:
+    name: Snapshot Publish
+    runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+      - name: Set up Node for GitHub Packages
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@drupflare'
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+      - name: Stamp the Version with the Commit
+        id: stamp
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          SNAPSHOT="${VERSION}-${GITHUB_SHA::7}"
+          npm version "$SNAPSHOT" --no-git-tag-version
+          echo "version=$SNAPSHOT" >> $GITHUB_OUTPUT
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm publish --access public
+      - name: Snapshot to Job Summary
+        if: always()
+        env:
+          SNAPSHOT: ${{ steps.stamp.outputs.version }}
+        run: |
+          echo "## Snapshot publish" >> $GITHUB_STEP_SUMMARY
+          echo "- Package: \`@drupflare/burrow@${SNAPSHOT}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Registry: GitHub Packages" >> $GITHUB_STEP_SUMMARY
+          echo "- Install: \`bun add @drupflare/burrow@${SNAPSHOT}\`" >> $GITHUB_STEP_SUMMARY
