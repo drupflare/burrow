@@ -1,0 +1,256 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>@drupflare/burrow - v1.0.0</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">@drupflare/burrow - v1.0.0</a>
+<div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<h1>@drupflare/burrow - v1.0.0</h1></div>
+<div class="tsd-panel tsd-typography"><h1 id="drupflareburrow" class="tsd-anchor-link">@drupflare/burrow<a href="#drupflareburrow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p>Execute arbitrary WebAssembly on Cloudflare Workers.</p>
+<h2 id="📋-table-of-contents" class="tsd-anchor-link">📋 Table of Contents<a href="#📋-table-of-contents" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><a href="#-why-burrow">🎯 Why Burrow</a></li>
+<li><a href="#-install">📥 Install</a></li>
+<li><a href="#-quick-start">🚀 Quick Start</a></li>
+<li><a href="#-execution-paths">🔁 Execution Paths</a></li>
+<li><a href="#-dynamic-libraries">🔗 Dynamic Libraries</a></li>
+<li><a href="#-declaring-a-runtime">📦 Declaring a Runtime</a></li>
+<li><a href="#-memory-budget">🧮 Memory Budget</a></li>
+<li><a href="#-doctor">🩺 Doctor</a></li>
+<li><a href="#-security">🔒 Security</a></li>
+<li><a href="#-subpath-exports">🧭 Subpath Exports</a></li>
+<li><a href="#-testing">🧪 Testing</a></li>
+<li><a href="#-license">📄 License</a></li>
+</ul>
+<h2 id="🎯-why-burrow" class="tsd-anchor-link">🎯 Why Burrow<a href="#🎯-why-burrow" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Cloudflare Workers forbids WebAssembly code generation at request time. A Worker cannot call
+<code>new WebAssembly.Module</code>, <code>WebAssembly.compile</code>, <code>eval</code> or <code>new Function</code>, so it cannot run code it
+did not know about at deploy time.</p>
+<p>burrow runs it anyway, by not compiling it. An interpreter compiled to wasm ships in the bundle, and
+a guest module arriving with a request is data to that interpreter. Nothing is generated, so nothing
+is blocked.</p>
+<p>The same property makes dynamic linking work. Loading a <code>-s SIDE_MODULE</code> build normally means
+producing a <code>funcref</code> for every address-taken symbol, which is code generation. To an interpreter a
+function pointer is an index into its own table, so that step does not exist.</p>
+<p>burrow ships no language runtime. The consumer provides one; burrow handles acquisition, residency
+and safety.</p>
+<h2 id="📥-install" class="tsd-anchor-link">📥 Install<a href="#📥-install" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="sh"><span class="hl-0">bun</span><span class="hl-1"> </span><span class="hl-2">add</span><span class="hl-1"> </span><span class="hl-2">@drupflare/burrow</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="🚀-quick-start" class="tsd-anchor-link">🚀 Quick Start<a href="#🚀-quick-start" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="ts"><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">wasm3</span><span class="hl-1"> </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow/vendor/wasm3.wasm&#39;</span><span class="hl-1">;</span><br/><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createInterpreter</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow/interpret&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-3">export</span><span class="hl-1"> </span><span class="hl-3">default</span><span class="hl-1"> {</span><br/><span class="hl-1">  </span><span class="hl-5">async</span><span class="hl-1"> </span><span class="hl-0">fetch</span><span class="hl-1">(</span><span class="hl-4">request</span><span class="hl-1">: </span><span class="hl-6">Request</span><span class="hl-1">) {</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">vm</span><span class="hl-1"> = </span><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-0">createInterpreter</span><span class="hl-1">({ </span><span class="hl-4">module:</span><span class="hl-1"> </span><span class="hl-4">wasm3</span><span class="hl-1"> });</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">guest</span><span class="hl-1"> = </span><span class="hl-4">vm</span><span class="hl-1">.</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Uint8Array</span><span class="hl-1">(</span><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-4">request</span><span class="hl-1">.</span><span class="hl-0">arrayBuffer</span><span class="hl-1">()));</span><br/><span class="hl-1">    </span><span class="hl-3">return</span><span class="hl-1"> </span><span class="hl-4">Response</span><span class="hl-1">.</span><span class="hl-0">json</span><span class="hl-1">({ </span><span class="hl-4">answer:</span><span class="hl-1"> </span><span class="hl-4">guest</span><span class="hl-1">.</span><span class="hl-0">call</span><span class="hl-1">(</span><span class="hl-2">&#39;main&#39;</span><span class="hl-1">) });</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">};</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Host functions are plain JavaScript, which is legal here because the guest's <code>call_indirect</code> never
+touches a real funcref table:</p>
+<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">guest</span><span class="hl-1"> = </span><span class="hl-4">vm</span><span class="hl-1">.</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-4">bytes</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-4">imports:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-4">env:</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-4">now:</span><span class="hl-1"> { </span><span class="hl-4">signature:</span><span class="hl-1"> </span><span class="hl-2">&#39;i()&#39;</span><span class="hl-1">, </span><span class="hl-0">fn</span><span class="hl-4">:</span><span class="hl-1"> () </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-4">Date</span><span class="hl-1">.</span><span class="hl-0">now</span><span class="hl-1">() | </span><span class="hl-8">0</span><span class="hl-1"> },</span><br/><span class="hl-1">      </span><span class="hl-4">log:</span><span class="hl-1"> { </span><span class="hl-4">signature:</span><span class="hl-1"> </span><span class="hl-2">&#39;v(ii)&#39;</span><span class="hl-1">, </span><span class="hl-0">fn</span><span class="hl-4">:</span><span class="hl-1"> (</span><span class="hl-4">ptr</span><span class="hl-1">, </span><span class="hl-4">len</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-4">console</span><span class="hl-1">.</span><span class="hl-0">log</span><span class="hl-1">(</span><span class="hl-4">guest</span><span class="hl-1">.</span><span class="hl-0">readText</span><span class="hl-1">(</span><span class="hl-4">ptr</span><span class="hl-1">, </span><span class="hl-4">len</span><span class="hl-1">)) }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="🔁-execution-paths" class="tsd-anchor-link">🔁 Execution Paths<a href="#🔁-execution-paths" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Three paths, chosen by one question: do you know this module at deploy time?</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>For</th>
+<th>Speed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>interpret</code></td>
+<td>bytes the deployment never saw</td>
+<td>see the ratio below</td>
+</tr>
+<tr>
+<td><code>import</code></td>
+<td>modules that shipped in the bundle</td>
+<td>1.00x, native</td>
+</tr>
+<tr>
+<td><code>publish</code></td>
+<td>bytes that should become native, in the background</td>
+<td>1.00x once live</td>
+</tr>
+</tbody>
+</table>
+<p><code>interpret</code> is the default because it is the only one that always works. <code>import</code> is not better,
+only narrower.</p>
+<p>The interpreted ratio is set by the guest, not by burrow:</p>
+<blockquote>
+<p><strong>ratio = 1 + D_cy x G</strong>, where <code>G</code> is guest instructions retired per native cycle.</p>
+</blockquote>
+<p>The interpreter's overhead is additive and nearly constant, so what decides the ratio is how much
+the guest already stalls. A pointer chase over a 64 MiB working set measures 1.01x; the same chase
+over 16 KiB measures 4.41x; a per-byte transform measures 20x.</p>
+<p><strong>Match the work to the path.</strong> Memory-bound and latency-bound work interprets for almost nothing.
+Compute-dense work with a small working set belongs in the bundle, or on the native path via
+<code>publish</code>. <a href="documents/ADVANCED_USAGE.html">ADVANCED_USAGE.md</a> carries the measured curve and the by-shape table.</p>
+<h2 id="🔗-dynamic-libraries" class="tsd-anchor-link">🔗 Dynamic Libraries<a href="#🔗-dynamic-libraries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="ts"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">createLinker</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow/dylink&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">linker</span><span class="hl-1"> = </span><span class="hl-0">createLinker</span><span class="hl-1">(</span><span class="hl-4">vm</span><span class="hl-1">);</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">lib</span><span class="hl-1"> = </span><span class="hl-4">linker</span><span class="hl-1">.</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-4">soBytes</span><span class="hl-1">, { </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&#39;ext&#39;</span><span class="hl-1"> });</span><br/><br/><span class="hl-4">lib</span><span class="hl-1">.</span><span class="hl-0">call</span><span class="hl-1">(</span><span class="hl-2">&#39;ext_run&#39;</span><span class="hl-1">, </span><span class="hl-8">20</span><span class="hl-1">, </span><span class="hl-8">22</span><span class="hl-1">);</span><br/><span class="hl-4">lib</span><span class="hl-1">.</span><span class="hl-0">readText</span><span class="hl-1">(</span><span class="hl-4">lib</span><span class="hl-1">.</span><span class="hl-0">address</span><span class="hl-1">(</span><span class="hl-2">&#39;greeting&#39;</span><span class="hl-1">)!);</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Linked against a host runtime, an extension shares the host's heap, table and symbols, which is what
+a real extension ABI needs:</p>
+<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">host</span><span class="hl-1"> = </span><span class="hl-4">vm</span><span class="hl-1">.</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-4">mainModuleBytes</span><span class="hl-1">);</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">ext</span><span class="hl-1"> = </span><span class="hl-0">createLinker</span><span class="hl-1">(</span><span class="hl-4">vm</span><span class="hl-1">, { </span><span class="hl-4">host</span><span class="hl-1"> }).</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-4">extensionBytes</span><span class="hl-1">);</span><br/><br/><span class="hl-4">ext</span><span class="hl-1">.</span><span class="hl-0">call</span><span class="hl-1">(</span><span class="hl-2">&#39;ext_install&#39;</span><span class="hl-1">); </span><span class="hl-9">// allocates from the host heap and calls back into it</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Admission reads the library's declared demand rather than its size, because a library's <code>.bss</code>
+occupies no bytes in the file:</p>
+<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> { </span><span class="hl-7">memorySize</span><span class="hl-1">, </span><span class="hl-7">tableSize</span><span class="hl-1">, </span><span class="hl-7">needed</span><span class="hl-1"> } = </span><span class="hl-4">linker</span><span class="hl-1">.</span><span class="hl-0">inspect</span><span class="hl-1">(</span><span class="hl-4">soBytes</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Verified against zlib 1.3.2 built as an ordinary <code>-s SIDE_MODULE</code>: the interpreted library
+compresses, and node's own zlib reads the result back.</p>
+<p>Loading at request time buys reach rather than speed. Anything on a hot path belongs in the bundle.
+<a href="documents/ADVANCED_USAGE.html">ADVANCED_USAGE.md</a> has the cost model and the work shapes that suit it.</p>
+<h2 id="📦-declaring-a-runtime" class="tsd-anchor-link">📦 Declaring a Runtime<a href="#📦-declaring-a-runtime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="ts"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">Burrow</span><span class="hl-1">, </span><span class="hl-4">defineRuntime</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">php</span><span class="hl-1"> = </span><span class="hl-0">defineRuntime</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">name:</span><span class="hl-1"> </span><span class="hl-2">&#39;php&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-0">load</span><span class="hl-4">:</span><span class="hl-1"> () </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-5">import</span><span class="hl-1">(</span><span class="hl-2">&#39;./runtimes/php.js&#39;</span><span class="hl-1">),</span><br/><span class="hl-1">  </span><span class="hl-0">instantiate</span><span class="hl-4">:</span><span class="hl-1"> </span><span class="hl-5">async</span><span class="hl-1"> ({ </span><span class="hl-4">loaded</span><span class="hl-1">, </span><span class="hl-4">io</span><span class="hl-1">, </span><span class="hl-4">lines</span><span class="hl-1"> }) </span><span class="hl-5">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">mod</span><span class="hl-1"> = </span><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-4">loaded</span><span class="hl-1">.</span><span class="hl-0">PHPFactory</span><span class="hl-1">({ </span><span class="hl-4">stdout:</span><span class="hl-1"> </span><span class="hl-0">lines</span><span class="hl-1">(</span><span class="hl-4">io</span><span class="hl-1">.</span><span class="hl-4">print</span><span class="hl-1">) });</span><br/><span class="hl-1">    </span><span class="hl-3">return</span><span class="hl-1"> { </span><span class="hl-4">FS:</span><span class="hl-1"> </span><span class="hl-4">mod</span><span class="hl-1">.</span><span class="hl-7">FS</span><span class="hl-1">, </span><span class="hl-0">callMain</span><span class="hl-4">:</span><span class="hl-1"> (</span><span class="hl-4">argv</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-4">mod</span><span class="hl-1">.</span><span class="hl-0">callMain</span><span class="hl-1">(</span><span class="hl-4">argv</span><span class="hl-1">) };</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-4">memory:</span><span class="hl-1"> { </span><span class="hl-4">initial:</span><span class="hl-1"> </span><span class="hl-8">96</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1">, </span><span class="hl-4">peak:</span><span class="hl-1"> </span><span class="hl-8">116</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1"> }</span><br/><span class="hl-1">});</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">burrow</span><span class="hl-1"> = </span><span class="hl-5">new</span><span class="hl-1"> </span><span class="hl-0">Burrow</span><span class="hl-1">({ </span><span class="hl-4">runtimes:</span><span class="hl-1"> [</span><span class="hl-4">php</span><span class="hl-1">] });</span><br/><br/><span class="hl-5">await using</span><span class="hl-1"> </span><span class="hl-7">sh</span><span class="hl-1"> = </span><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-4">burrow</span><span class="hl-1">.</span><span class="hl-0">session</span><span class="hl-1">(</span><span class="hl-2">&#39;php&#39;</span><span class="hl-1">);</span><br/><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-4">sh</span><span class="hl-1">.</span><span class="hl-0">evalText</span><span class="hl-1">(</span><span class="hl-2">&#39;&lt;?php echo phpversion();&#39;</span><span class="hl-1">);</span>
+</code><button type="button">Copy</button></pre>
+
+<p><code>load</code> must be a thunk around a literal specifier, because esbuild cannot follow a computed one.</p>
+<h2 id="🧮-memory-budget" class="tsd-anchor-link">🧮 Memory Budget<a href="#🧮-memory-budget" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>Budget</code> tracks linear memory per resident runtime against the isolate cap, refuses a boot that
+would not fit, and evicts least-recently-used residents first. Declared figures are corrected from
+observation after each run.</p>
+<p>A lease is the interlock: nothing leased is ever evicted, and a boot that cannot fit throws
+<code>BudgetError</code> rather than letting the isolate run out.</p>
+<h2 id="🩺-doctor" class="tsd-anchor-link">🩺 Doctor<a href="#🩺-doctor" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="sh"><span class="hl-0">bunx</span><span class="hl-1"> </span><span class="hl-2">burrow</span><span class="hl-1"> </span><span class="hl-2">doctor</span><span class="hl-1"> </span><span class="hl-2">./runtimes/php.js</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Scans a runtime for patterns that are fatal on Workers: <code>eval</code>, <code>new Function</code>, request-time wasm
+compilation, browser-only glue, and an unguarded <code>self.location</code> read. It reports findings and never
+a clean bill of health, because a source scan cannot prove the absence of a JIT. Exit code 0 means
+nothing known-fatal was seen.</p>
+<h2 id="🔒-security" class="tsd-anchor-link">🔒 Security<a href="#🔒-security" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>burrow runs code the deployment never saw. Treat a guest as untrusted unless you built it.</p>
+<p><strong>What the platform already handles.</strong> A Worker isolate is ephemeral and has no filesystem, no
+subprocesses and no syscalls, so the persistence-shaped threats do not apply: there is nowhere for a
+miner to keep running, nothing for a trojan to install into, and no host to pivot to. A hostile
+guest gets one request.</p>
+<p><strong>What is left is the capabilities you hand over.</strong> The guest can reach exactly as far as the host
+functions you supply. An import that fetches reaches the network; one that reads a binding reads
+your data; one that takes a pointer and a length can be handed any pointer. Supply the narrowest
+imports that do the job, validate arguments inside them rather than trusting the guest, and grant
+nothing you would not grant a browser extension.</p>
+<pre><code class="ts"><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">vm</span><span class="hl-1"> = </span><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-0">createInterpreter</span><span class="hl-1">({ </span><span class="hl-4">module:</span><span class="hl-1"> </span><span class="hl-4">wasm3</span><span class="hl-1">, </span><span class="hl-4">maxMemoryBytes:</span><span class="hl-1"> </span><span class="hl-8">64</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1"> * </span><span class="hl-8">1024</span><span class="hl-1"> });</span><br/><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">guest</span><span class="hl-1"> = </span><span class="hl-4">vm</span><span class="hl-1">.</span><span class="hl-0">load</span><span class="hl-1">(</span><span class="hl-4">untrustedBytes</span><span class="hl-1">, {</span><br/><span class="hl-1">  </span><span class="hl-4">imports:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-4">env:</span><span class="hl-1"> {</span><br/><span class="hl-1">      </span><span class="hl-9">// no fetch, no bindings, no clock the caller did not ask for</span><br/><span class="hl-1">      </span><span class="hl-4">log:</span><span class="hl-1"> {</span><br/><span class="hl-1">        </span><span class="hl-4">signature:</span><span class="hl-1"> </span><span class="hl-2">&#39;v(ii)&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">        </span><span class="hl-0">fn</span><span class="hl-4">:</span><span class="hl-1"> (</span><span class="hl-4">ptr</span><span class="hl-1">, </span><span class="hl-4">len</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-0">record</span><span class="hl-1">(</span><span class="hl-4">guest</span><span class="hl-1">.</span><span class="hl-0">readText</span><span class="hl-1">(</span><span class="hl-4">ptr</span><span class="hl-1">, </span><span class="hl-4">Math</span><span class="hl-1">.</span><span class="hl-0">min</span><span class="hl-1">(</span><span class="hl-4">len</span><span class="hl-1">, </span><span class="hl-8">4096</span><span class="hl-1">)))</span><br/><span class="hl-1">      }</span><br/><span class="hl-1">    }</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<p><strong>Set <code>maxMemoryBytes</code> for any guest you did not build.</strong> Without it a guest can grow memory until
+the isolate dies, and an isolate OOM fails every request on that isolate rather than one.</p>
+<p><strong>Dynamic libraries linked into a host are not sandboxed from it.</strong> They share one memory and one
+table, so a library can read and write everything the host holds and call anything the host can.
+That is what an extension ABI is, and it is also what a hostile library wants, so it has to be asked
+for:</p>
+<pre><code class="ts"><span class="hl-0">createLinker</span><span class="hl-1">(</span><span class="hl-4">vm</span><span class="hl-1">, { </span><span class="hl-4">host</span><span class="hl-1">, </span><span class="hl-4">allowHostAccess:</span><span class="hl-1"> </span><span class="hl-5">true</span><span class="hl-1"> }); </span><span class="hl-9">// only for libraries you would run in-process</span><br/><span class="hl-0">createLinker</span><span class="hl-1">(</span><span class="hl-4">vm</span><span class="hl-1">); </span><span class="hl-9">// user-supplied: each library gets an address space of its own</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Without a host, libraries resolve no symbols across each other and cannot reach the host's heap.</p>
+<p><strong>Guest memory is isolated; guest CPU is not.</strong> Every guest access is bounds-checked, so a guest
+cannot read the interpreter or another guest. Nothing here stops a guest spinning, so the Worker CPU
+limit is what ends a runaway loop. Do not run untrusted guests inside a Durable Object you need to
+stay responsive.</p>
+<p><strong>Isolates are shared across requests.</strong> Anything a previous request left in an interpreter's memory
+is readable by the next guest loaded into it. Create a fresh interpreter per tenant, or per request
+where the data warrants it.</p>
+<p><code>burrow doctor</code> reports findings and never a clean bill of health, so it is a lint rather than a
+gate. <a href="documents/ADVANCED_USAGE.html#security">ADVANCED_USAGE.md</a> has the threat model in full.</p>
+<h2 id="🧭-subpath-exports" class="tsd-anchor-link">🧭 Subpath Exports<a href="#🧭-subpath-exports" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>Export</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.</code></td>
+<td>the whole public surface</td>
+</tr>
+<tr>
+<td><code>./interpret</code></td>
+<td><code>createInterpreter</code>, <code>WasmInterpreter</code></td>
+</tr>
+<tr>
+<td><code>./dylink</code></td>
+<td><code>createLinker</code>, <code>readDylink</code>, <code>Library</code></td>
+</tr>
+<tr>
+<td><code>./registry</code></td>
+<td><code>Burrow</code>, leases</td>
+</tr>
+<tr>
+<td><code>./session</code></td>
+<td><code>Session</code> and the <code>eval</code> surface</td>
+</tr>
+<tr>
+<td><code>./budget</code></td>
+<td><code>Budget</code></td>
+</tr>
+<tr>
+<td><code>./runtime</code></td>
+<td><code>defineRuntime</code>, <code>RuntimeSpec</code></td>
+</tr>
+<tr>
+<td><code>./adapt</code></td>
+<td><code>lines</code>, <code>memoryFS</code>, <code>mkdirp</code></td>
+</tr>
+<tr>
+<td><code>./doctor</code></td>
+<td><code>inspectSource</code>, <code>inspectWasm</code></td>
+</tr>
+<tr>
+<td><code>./errors</code></td>
+<td>every error type and its code</td>
+</tr>
+</tbody>
+</table>
+<h2 id="🧪-testing" class="tsd-anchor-link">🧪 Testing<a href="#🧪-testing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="sh"><span class="hl-0">bun</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">typecheck</span><br/><span class="hl-0">bun</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test</span><span class="hl-1">          </span><span class="hl-9"># gate: unit and node</span><br/><span class="hl-0">bun</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">test:runtimes</span><span class="hl-1"> </span><span class="hl-9"># real builds installed from npm</span><br/><span class="hl-0">bun</span><span class="hl-1"> </span><span class="hl-2">run</span><span class="hl-1"> </span><span class="hl-2">format:check</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Every error carries a stable dotted <code>code</code>. Match on that, never on a message.</p>
+<h2 id="📄-license" class="tsd-anchor-link">📄 License<a href="#📄-license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>MIT</p>
+</div></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details"><a href="#drupflareburrow"><span>@drupflare/burrow</span></a>
+<ul>
+<li><a href="#📋-table-of-contents"><span>📋 <wbr/>Table of <wbr/>Contents</span></a></li>
+<li><a href="#🎯-why-burrow"><span>🎯 <wbr/>Why <wbr/>Burrow</span></a></li>
+<li><a href="#📥-install"><span>📥 <wbr/>Install</span></a></li>
+<li><a href="#🚀-quick-start"><span>🚀 <wbr/>Quick <wbr/>Start</span></a></li>
+<li><a href="#🔁-execution-paths"><span>🔁 <wbr/>Execution <wbr/>Paths</span></a></li>
+<li><a href="#🔗-dynamic-libraries"><span>🔗 <wbr/>Dynamic <wbr/>Libraries</span></a></li>
+<li><a href="#📦-declaring-a-runtime"><span>📦 <wbr/>Declaring a <wbr/>Runtime</span></a></li>
+<li><a href="#🧮-memory-budget"><span>🧮 <wbr/>Memory <wbr/>Budget</span></a></li>
+<li><a href="#🩺-doctor"><span>🩺 <wbr/>Doctor</span></a></li>
+<li><a href="#🔒-security"><span>🔒 <wbr/>Security</span></a></li>
+<li><a href="#🧭-subpath-exports"><span>🧭 <wbr/>Subpath <wbr/>Exports</span></a></li>
+<li><a href="#🧪-testing"><span>🧪 <wbr/>Testing</span></a></li>
+<li><a href="#📄-license"><span>📄 <wbr/>License</span></a></li></ul></div></details></div>
+<div class="site-menu">
+<nav class="tsd-navigation"><a href="modules.html">@drupflare/burrow - v1.0.0</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>
