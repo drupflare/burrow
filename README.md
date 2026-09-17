@@ -196,7 +196,8 @@ const guest = vm.load(untrustedBytes, {
       // no fetch, no bindings, no clock the caller did not ask for
       log: {
         signature: 'v(ii)',
-        fn: (ptr, len) => record(guest.readText(ptr, Math.min(len, 4096)))
+        // cap the length here rather than trusting the one the guest passed
+        fn: (ptr, len) => console.log(guest.readText(ptr, Math.min(len, 4096)))
       }
     }
   }
@@ -243,7 +244,15 @@ gate. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#security) has the threat model in fu
 | `./runtime`   | `defineRuntime`, `RuntimeSpec`          |
 | `./adapt`     | `lines`, `memoryFS`, `mkdirp`           |
 | `./doctor`    | `inspectSource`, `inspectWasm`          |
+| `./publish`   | `publishVersion`                        |
+| `./probe`     | `probe`                                 |
 | `./errors`    | every error type and its code           |
+
+The interpreter binary is an asset rather than a module, and it is imported by path:
+
+```ts
+import wasm3 from '@drupflare/burrow/vendor/wasm3.wasm';
+```
 
 ## 🧪 Testing
 

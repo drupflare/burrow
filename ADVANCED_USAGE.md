@@ -365,10 +365,10 @@ holding your bindings.
 
 ### What the platform already takes off the table
 
-Most of what "arbitrary code execution" usually means does not apply here, and it is worth being
-precise about why rather than inheriting the general fear.
+Most of what "arbitrary code execution" usually means does not apply here, and the reasons are
+specific.
 
-A Worker isolate is ephemeral and deliberately minimal. There is no filesystem, no `exec`, no
+A Worker isolate is ephemeral and minimal. There is no filesystem, no `exec`, no
 subprocess, no syscall surface and no persistence between isolates. A guest cannot install anything,
 cannot survive its request, cannot open a port, and cannot reach the machine. The classic outcomes,
 a miner that keeps running, a trojan that persists, a foothold that gets pivoted from, have nowhere

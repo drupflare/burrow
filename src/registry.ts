@@ -39,7 +39,7 @@ export interface BurrowOptions {
 }
 
 interface Resident {
-	// the spec's type parameter is erased here on purpose: the registry never inspects `loaded`
+	// the spec's type parameter is erased here; the registry never inspects `loaded`
 	spec: AnyRuntimeSpec;
 	loaded: unknown;
 	interpreter: Interpreter | null;

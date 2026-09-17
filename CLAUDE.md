@@ -4,8 +4,9 @@
 
 ## Status
 
-Pre-release. Nothing is published to npm before the probe CLI lands and the docs carry
-deploy-produced numbers. `release.yml` exists and is `workflow_dispatch`-only; it has not been fired.
+1.0.0. `release.yml` cuts the tag, the GitHub release and both registry publishes in one
+`workflow_dispatch` run, and it is the only way this package reaches npm. Every push to master also
+publishes a per-commit snapshot to GitHub Packages under the `snapshot` dist-tag.
 
 ## The things that are load-bearing and non-obvious
 
