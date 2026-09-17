@@ -57,6 +57,7 @@
 			"types": "./dist/session.d.ts",
 			"import": "./dist/session.js"
 		},
+		"./vendor/wasm3.wasm": "./dist/vendor/wasm3.wasm",
 		"./package.json": "./package.json"
 	},
 	"sideEffects": false,
@@ -67,7 +68,7 @@
 		"ADVANCED_USAGE.md"
 	],
 	"scripts": {
-		"build": "tsc -p ./tsconfig.build.json",
+		"build": "tsc -p ./tsconfig.build.json && mkdir -p dist/vendor && cp src/vendor/wasm3.wasm dist/vendor/wasm3.wasm",
 		"build:interp": "bash tools/build-interp.sh",
 		"typecheck": "tsc -p ./tsconfig.json --noEmit && tsc -p ./tsconfig.test.json --noEmit",
 		"test": "vitest run --project=unit --project=node",

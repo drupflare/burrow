@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import pkg from '../package.json';
+import readme from '../README.md?raw';
 import * as adaptModule from '../src/adapt.js';
 import * as budgetModule from '../src/budget.js';
 import * as doctorModule from '../src/doctor.js';
@@ -53,6 +54,9 @@ const SUBPATHS: Array<[string, string, Record<string, unknown>, string]> = [
 type ExportEntry = { types: string; import: string };
 const exportsMap = pkg.exports as unknown as Record<string, ExportEntry | string>;
 
+/** the interpreter binary, which is an asset rather than a module and so has no types entry */
+const VENDOR_SUBPATH = './vendor/wasm3.wasm';
+
 describe('the package exports map', () => {
 	it.each(SUBPATHS)(
 		'%s resolves to dist/%s.js and exposes %s',
@@ -69,7 +73,7 @@ describe('the package exports map', () => {
 
 	it('names every subpath the modules provide and nothing more', () => {
 		const declared = Object.keys(exportsMap)
-			.filter((k) => k !== './package.json')
+			.filter((k) => k !== './package.json' && k !== VENDOR_SUBPATH)
 			.sort();
 		const expected = SUBPATHS.map(([s]) => s).sort();
 		expect(declared).toEqual(expected);
@@ -113,6 +117,38 @@ describe('the package exports map', () => {
 
 	it('points bin at a file inside dist', () => {
 		expect(pkg.bin).toEqual({ burrow: 'dist/bin/burrow.js' });
+	});
+});
+
+describe('the vendored interpreter', () => {
+	// every doc and TSDoc example tells a consumer to import this exact specifier, and it resolved to
+	// nothing until 1.0.0: tsc copies no assets, so dist carried no wasm and the map named no subpath
+	it('is reachable at the specifier the docs tell consumers to import', () => {
+		expect(exportsMap[VENDOR_SUBPATH]).toBe('./dist/vendor/wasm3.wasm');
+	});
+
+	it('exists in src for the build to copy', () => {
+		expect(Object.keys(import.meta.glob('../src/vendor/*.wasm'))).toEqual([
+			'../src/vendor/wasm3.wasm'
+		]);
+	});
+
+	it('is copied into dist by the build, because tsc emits only what it compiles', () => {
+		expect(pkg.scripts.build).toContain('src/vendor/wasm3.wasm dist/vendor/wasm3.wasm');
+	});
+});
+
+describe('the readme', () => {
+	// the map drifted from the table once already: ./publish and ./probe shipped undocumented, so a
+	// reader could not find two of the three execution paths the readme itself names
+	const documented = Object.keys(exportsMap).filter((s) => s !== '.' && s !== './package.json');
+
+	it.each(documented)('documents the %s subpath', (subpath) => {
+		const specifier = `@drupflare/burrow${subpath.slice(1)}`;
+		expect(
+			readme.includes(subpath) || readme.includes(specifier),
+			`${subpath} is exported but appears nowhere in README.md`
+		).toBe(true);
 	});
 });
 
