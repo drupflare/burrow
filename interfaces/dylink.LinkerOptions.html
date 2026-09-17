@@ -13,7 +13,7 @@
 <h1>Interface LinkerOptions</h1></div>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">LinkerOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#allocator">allocator</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#allowhostaccess">allowHostAccess</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#deallocator">deallocator</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#host">host</a><span class="tsd-signature-symbol">?:</span> <a href="interpret.Guest.html" class="tsd-signature-type tsd-kind-interface">Guest</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#imports">imports</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="../types/dylink.SuppliedImport.html" class="tsd-signature-type tsd-kind-type-alias">SuppliedImport</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#standalonepages">standalonePages</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L126">src/dylink.ts:126</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L126">src/dylink.ts:126</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -37,7 +37,7 @@
 <div class="tsd-comment tsd-typography"><p>the host export that allocates a library's static region; ignored when there is no host</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L152">src/dylink.ts:152</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L152">src/dylink.ts:152</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="allowhostaccess"><code class="tsd-tag">Optional</code><span>allow<wbr/>Host<wbr/>Access</span><a href="#allowhostaccess" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">allowHostAccess</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
@@ -56,14 +56,14 @@ its own and resolves no symbols across libraries.</p>
 <h4 class="tsd-anchor-link" id="since">Since<a href="#since" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h4><p>1.0.0</p>
 </div></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L150">src/dylink.ts:150</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L150">src/dylink.ts:150</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="deallocator"><code class="tsd-tag">Optional</code><span>deallocator</span><a href="#deallocator" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">deallocator</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>the host export that gives it back on <a href="../classes/dylink.Linker.html#unload" class="tsd-kind-method">Linker.unload</a>; defaults to <code>free</code></p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L154">src/dylink.ts:154</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L154">src/dylink.ts:154</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="host"><code class="tsd-tag">Optional</code><span>host</span><a href="#host" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">host</span><span class="tsd-signature-symbol">?:</span> <a href="interpret.Guest.html" class="tsd-signature-type tsd-kind-interface">Guest</a></div>
@@ -73,14 +73,14 @@ share. Without one, each library is placed in an address space of its own.</p>
 an emscripten <code>-s MAIN_MODULE</code> build does.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L134">src/dylink.ts:134</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L134">src/dylink.ts:134</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="imports"><code class="tsd-tag">Optional</code><span>imports</span><a href="#imports" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">imports</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">Record</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">,</span> <a href="../types/dylink.SuppliedImport.html" class="tsd-signature-type tsd-kind-type-alias">SuppliedImport</a><span class="tsd-signature-symbol">&gt;</span></div>
 <div class="tsd-comment tsd-typography"><p>symbols the caller answers itself, tried after the host and the loaded libraries</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L156">src/dylink.ts:156</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L156">src/dylink.ts:156</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="standalonepages"><code class="tsd-tag">Optional</code><span>standalone<wbr/>Pages</span><a href="#standalonepages" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">standalonePages</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
@@ -88,7 +88,7 @@ an emscripten <code>-s MAIN_MODULE</code> build does.</p>
 image plus <a href="../variables/dylink.DEFAULT_STANDALONE_STACK.html" class="tsd-kind-variable">DEFAULT_STANDALONE_STACK</a>; raise it for anything that recurses deeply.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/d688629d3f8ed6c622f7f386cd37883c4e802ffe/src/dylink.ts#L161">src/dylink.ts:161</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/8f5be3c269a0d2ba068275cf8fd7690b86dbbaef/src/dylink.ts#L161">src/dylink.ts:161</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
