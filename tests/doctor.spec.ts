@@ -130,6 +130,28 @@ describe('inspectWasm', () => {
 	it('finds nothing in a module with no type section', () => {
 		expect(inspectWasm(wasmWith(3, [0x00])).findings).toEqual([]);
 	});
+
+	it('flags a v128 in a function signature', () => {
+		// one type, form 0x60, one param of type 0x7b (v128), no results
+		const report = inspectWasm(wasmWith(1, [0x01, 0x60, 0x01, 0x7b, 0x00]));
+		expect(report.fatal).toBe(true);
+		expect(report.findings[0]?.rule).toBe('wasm-simd');
+		expect(report.findings[0]?.reason).toContain('msimd128');
+	});
+
+	it('flags a v128 local, which is where toolchain output declares one', () => {
+		// code section: 1 body, 4 bytes, 1 local group, count 1, type 0x7b, end
+		const report = inspectWasm(wasmWith(10, [0x01, 0x04, 0x01, 0x01, 0x7b, 0x0b]));
+		expect(report.fatal).toBe(true);
+		expect(report.findings[0]?.rule).toBe('wasm-simd');
+	});
+
+	it('leaves a scalar module alone, locals and all', () => {
+		// the same shape with an i32 local, so the walk is what distinguishes them
+		expect(inspectWasm(wasmWith(10, [0x01, 0x04, 0x01, 0x01, 0x7f, 0x0b])).findings).toEqual(
+			[]
+		);
+	});
 });
 
 describe('the wasm reader', () => {

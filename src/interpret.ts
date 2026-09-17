@@ -1,3 +1,4 @@
+import { usesVector } from './doctor.js';
 import { InterpretError } from './errors.js';
 
 /**
@@ -43,6 +44,23 @@ export interface InterpreterOptions {
 	 * stack; a smaller value makes deep guest recursion trap as a stack overflow.
 	 */
 	stackBytes?: number;
+	/**
+	 * A ceiling, in bytes, on the linear memory any one guest may hold. Unset means no ceiling.
+	 *
+	 * **Set this whenever the guest is not yours.** Without it a guest can grow memory until the
+	 * isolate dies, and an isolate OOM takes down the whole Durable Object rather than one request.
+	 *
+	 * What the guest sees is worth knowing exactly, because wasm3 clamps rather than refuses:
+	 * `memory.grow` answers success and `memory.size` reports the larger size, but only memory up to
+	 * the ceiling is backed, so the first access past it traps with an out-of-bounds. Memory safety
+	 * holds; what the guest is told about its own size does not. A guest that checks `memory.grow`
+	 * will believe it and trap later.
+	 *
+	 * The trade is deliberate: a trapped guest fails one request, an isolate OOM fails all of them.
+	 *
+	 * @since 1.0.0
+	 */
+	maxMemoryBytes?: number;
 }
 
 export interface LoadOptions {
@@ -108,7 +126,7 @@ export function parseSignature(signature: Signature): { arity: number; returns: 
 interface Shim {
 	memory: WebAssembly.Memory;
 	_initialize(): void;
-	burrow_init(stackBytes: number): number;
+	burrow_init(stackBytes: number, maxMemoryBytes: number): number;
 	burrow_parse(ptr: number, len: number): number;
 	burrow_instantiate(index: number): number;
 	burrow_name(index: number, name: number): number;
@@ -139,6 +157,9 @@ interface Shim {
 	burrow_grow_table(index: number, extra: number): number;
 	burrow_table_put(owner: number, slot: number, from: number, name: number): number;
 	burrow_table_find(owner: number, from: number, name: number): number;
+	burrow_table_clear(owner: number, slot: number, count: number): number;
+	burrow_unload(index: number): number;
+	burrow_fused(): number;
 }
 
 const encoder = new TextEncoder();
@@ -201,7 +222,10 @@ export async function createInterpreter(options: InterpreterOptions): Promise<Wa
 	shim = instance.exports as unknown as Shim;
 	shim._initialize();
 
-	const rc = shim.burrow_init(options.stackBytes ?? DEFAULT_STACK_BYTES);
+	const rc = shim.burrow_init(
+		options.stackBytes ?? DEFAULT_STACK_BYTES,
+		options.maxMemoryBytes ?? 0
+	);
 	if (rc !== 0) throw new InterpretError(readError(shim), 'burrow.interpret.init_failed');
 
 	return new WasmInterpreter(shim, handlers);
@@ -225,6 +249,9 @@ function readError(shim: Shim): string {
  * @since 1.0.0
  */
 export class WasmInterpreter {
+	/** @internal the buffer each parsed module's bytes live in, freed when the module is unloaded */
+	private readonly parsed = new Map<number, number>();
+
 	/** @internal */
 	constructor(
 		private readonly shim: Shim,
@@ -239,6 +266,18 @@ export class WasmInterpreter {
 	/** how much memory the interpreter currently holds, in bytes */
 	get memoryBytes(): number {
 		return this.shim.memory.buffer.byteLength;
+	}
+
+	/**
+	 * How many operation sequences the interpreter has replaced with a fused handler.
+	 *
+	 * Guests compile lazily, so this grows as functions are first called and is 0 before anything
+	 * runs. It reports what the interpreter did, not how fast it was.
+	 *
+	 * @since 1.0.0
+	 */
+	get fusedSequences(): number {
+		return this.shim.burrow_fused();
 	}
 
 	/**
@@ -267,6 +306,15 @@ export class WasmInterpreter {
 	 * @internal
 	 */
 	parse(wasm: Uint8Array): number {
+		// wasm3 compiles a function on first call, so an unimplemented opcode surfaces mid-request as
+		// "unknown label" rather than at load; this says what is actually wrong, before anything runs
+		if (usesVector(wasm)) {
+			throw new InterpretError(
+				'the guest declares a v128 value and the interpreter implements none of the SIMD ' +
+					'proposal; rebuild the guest without -msimd128, or run it through import or publish',
+				'burrow.interpret.unsupported'
+			);
+		}
 		const ptr = this.shim.burrow_alloc(wasm.length);
 		if (!ptr) {
 			throw new InterpretError('out of interpreter memory', 'burrow.interpret.load_failed');
@@ -274,9 +322,30 @@ export class WasmInterpreter {
 		this.bytes.set(wasm, ptr);
 		const index = this.shim.burrow_parse(ptr, wasm.length);
 		if (index < 0) {
+			this.shim.burrow_free(ptr);
 			throw new InterpretError(readError(this.shim), 'burrow.interpret.load_failed');
 		}
+		// wasm3 points into this buffer rather than copying it, so it has to outlive the module
+		this.parsed.set(index, ptr);
 		return index;
+	}
+
+	/**
+	 * @internal releases a module: unlinks it from the runtime, frees it and frees its bytes.
+	 *
+	 * Clear any table slots pointing into the module first, with {@link tableClear}; wasm3 stops a
+	 * freed module from freeing a table it borrowed, but it does not empty the entries the module
+	 * wrote into someone else's table, and those would dangle.
+	 */
+	unload(index: number): void {
+		if (this.shim.burrow_unload(index) !== 0) {
+			throw new InterpretError(readError(this.shim), 'burrow.interpret.load_failed');
+		}
+		const ptr = this.parsed.get(index);
+		if (ptr !== undefined) {
+			this.shim.burrow_free(ptr);
+			this.parsed.delete(index);
+		}
 	}
 
 	/** @internal resolves the module's imports, backs its memory and runs its initializers */
@@ -407,6 +476,14 @@ export class WasmInterpreter {
 	}
 
 	/** @internal the slot a function already occupies, or -1 */
+	/** @internal empties a run of table slots, so unloading their module leaves nothing dangling */
+	tableClear(owner: number, slot: number, count: number): void {
+		if (count <= 0) return;
+		if (this.shim.burrow_table_clear(owner, slot, count) !== 0) {
+			throw new InterpretError(readError(this.shim), 'burrow.interpret.link_failed');
+		}
+	}
+
 	tableFind(owner: number, from: number, name: string): number {
 		return this.shim.burrow_table_find(owner, from, this.cstring(name));
 	}

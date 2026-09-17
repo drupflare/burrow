@@ -132,8 +132,26 @@ export interface LinkerOptions {
 	 * an emscripten `-s MAIN_MODULE` build does.
 	 */
 	host?: Guest;
+	/**
+	 * Acknowledges what linking into a host costs, and is required whenever {@link host} is set.
+	 *
+	 * A library placed in a host's address space is not sandboxed from it. It shares one linear
+	 * memory, so it can read and write every byte the host holds, including anything another request
+	 * left there; it shares one table, so it can call anything the host can; and its relocations are
+	 * addresses the linker hands it. That is what makes a real extension ABI work and it is
+	 * indistinguishable from what a hostile library would want.
+	 *
+	 * Set it to `true` only for libraries you would run in-process anyway. Leave it unset for
+	 * anything a user supplied, and load those without a host, where each gets an address space of
+	 * its own and resolves no symbols across libraries.
+	 *
+	 * @since 1.0.0
+	 */
+	allowHostAccess?: boolean;
 	/** the host export that allocates a library's static region; ignored when there is no host */
 	allocator?: string;
+	/** the host export that gives it back on {@link Linker.unload}; defaults to `free` */
+	deallocator?: string;
 	/** symbols the caller answers itself, tried after the host and the loaded libraries */
 	imports?: Record<string, SuppliedImport>;
 	/**
@@ -498,6 +516,26 @@ interface Placement {
 	tableBase: number;
 	/** pages the memory must reach after instantiation, for a standalone library */
 	growTo?: number;
+	/** the unaligned block the host allocator answered, which is what has to be handed back */
+	rawPointer?: number;
+}
+
+/** @internal what unloading a library has to give back */
+interface Residency {
+	index: number;
+	rawPointer?: number;
+	tableOwner: number;
+	tableBase: number;
+	tableSize: number;
+	/** modules this library resolved symbols from, so one still in use cannot be unloaded */
+	dependsOn: Set<number>;
+}
+
+/** @internal a table slot handed out for a function, tracked so unloading can reclaim it */
+interface Slot {
+	key: string;
+	tableOwner: number;
+	slot: number;
 }
 
 /**
@@ -516,6 +554,14 @@ export class Linker {
 	private readonly slots = new Map<string, number>();
 	/** next free slot per table-owning module, so a slot can be named before the table exists */
 	private readonly tableTop = new Map<number, number>();
+	/** slots an unload gave back, reused before the top is raised again */
+	private readonly reusable = new Map<number, number[]>();
+	/** slots handed out per defining module, so unloading it can clear and reclaim them */
+	private readonly slotsByModule = new Map<number, Slot[]>();
+	/** what each loaded library holds, so unloading it can give it back */
+	private readonly residency = new Map<string, Residency>();
+	/** the library currently being loaded, collecting the modules it resolves against */
+	private loading: Set<number> | null = null;
 	/** table writes waiting on the owning module to be instantiated */
 	private pending: { tableOwner: number; slot: number; owner: number; name: string }[] = [];
 	private anonymous = 0;
@@ -525,6 +571,14 @@ export class Linker {
 		private readonly vm: WasmInterpreter,
 		private readonly options: LinkerOptions = {}
 	) {
+		if (options.host && !options.allowHostAccess) {
+			throw new DylinkError(
+				'linking into a host address space gives the library the host memory and table in ' +
+					'full, so it must be asked for: pass allowHostAccess: true, or omit host to ' +
+					'place each library on its own',
+				'burrow.dylink.host_access_denied'
+			);
+		}
 		// a side module imports from "env", so this is what makes the host answer for it
 		if (options.host) this.vm.nameModule(options.host.index, 'env');
 	}
@@ -566,6 +620,8 @@ export class Linker {
 		const supplied = { ...this.options.imports, ...options.imports };
 
 		const index = this.vm.parse(bytes);
+		const deps = new Set<number>();
+		this.loading = deps;
 		const placement = this.options.host
 			? this.placeInHost(this.options.host, info)
 			: this.placeStandalone(index, info);
@@ -607,6 +663,8 @@ export class Linker {
 			else if (!this.hostAnswers(entry.field)) unresolved.push(`env.${entry.field}`);
 		}
 
+		this.loading = null;
+
 		if (unresolved.length) {
 			throw new DylinkError(
 				`${name}: nothing resolves ${unresolved.length} symbol(s): ${unresolved.join(', ')}`,
@@ -637,6 +695,14 @@ export class Linker {
 		this.record(index, exports, own, placement.memoryBase);
 		const library = this.build(name, info, placement, guest, exports, own);
 		this.libraries.set(name, library);
+		this.residency.set(name, {
+			index,
+			rawPointer: placement.rawPointer,
+			tableOwner: this.options.host?.index ?? index,
+			tableBase: placement.tableBase,
+			tableSize: info.tableSize,
+			dependsOn: deps
+		});
 
 		if (!options.skipInitializers) {
 			// emcc emits a start section whenever a pointer in the static image needs __memory_base
@@ -647,6 +713,69 @@ export class Linker {
 		}
 
 		return library;
+	}
+
+	/**
+	 * Unloads a library and gives back everything it held.
+	 *
+	 * Reclaims the static image (handed back to the host allocator), the table slots the library
+	 * owns and any handed out for its functions, its symbols, its host-import bindings and the
+	 * module itself. A later {@link load} reuses the freed slots rather than growing the table again.
+	 *
+	 * Compiled code pages are the one thing NOT reclaimed: wasm3 gates that on
+	 * `d_m3EnableCodePageRefCounting`, which upstream leaves off, so code for functions that actually
+	 * ran stays with the interpreter until it is dropped.
+	 *
+	 * @returns whether a library of that name was loaded
+	 * @throws {DylinkError} `burrow.dylink.in_use` when another loaded library resolved a symbol
+	 *   from this one, because unloading it would leave that library holding a dangling pointer
+	 * @since 1.0.0
+	 */
+	unload(name: string): boolean {
+		const held = this.residency.get(name);
+		if (!held) return false;
+
+		const users = [...this.residency]
+			.filter(([other, record]) => other !== name && record.dependsOn.has(held.index))
+			.map(([other]) => other);
+		if (users.length) {
+			throw new DylinkError(
+				`${name} is still linked against by ${users.join(', ')}`,
+				'burrow.dylink.in_use'
+			);
+		}
+
+		// clear before freeing the module: wasm3 stops a freed module from freeing a table it
+		// borrowed, but the entries it wrote into the host's table are left pointing at freed memory
+		const recycled = this.reusable.get(held.tableOwner) ?? [];
+		for (const slot of this.slotsByModule.get(held.index) ?? []) {
+			this.vm.tableClear(slot.tableOwner, slot.slot, 1);
+			this.slots.delete(slot.key);
+			if (slot.tableOwner === held.tableOwner) recycled.push(slot.slot);
+		}
+		this.slotsByModule.delete(held.index);
+
+		if (this.options.host && held.tableSize > 0) {
+			this.vm.tableClear(held.tableOwner, held.tableBase, held.tableSize);
+			for (let i = 0; i < held.tableSize; i++) recycled.push(held.tableBase + i);
+		}
+		if (recycled.length) this.reusable.set(held.tableOwner, recycled);
+
+		for (const [symbol, definition] of [...this.definitions]) {
+			if (definition.owner === held.index) this.definitions.delete(symbol);
+		}
+
+		this.vm.unload(held.index);
+
+		// after the module is gone, so a trap during unload cannot leave the heap block orphaned
+		if (held.rawPointer !== undefined && this.options.host) {
+			const free = this.options.deallocator ?? 'free';
+			if (this.options.host.has(free)) this.options.host.call(free, held.rawPointer);
+		}
+
+		this.libraries.delete(name);
+		this.residency.delete(name);
+		return true;
 	}
 
 	/** @internal whether the host module exports the symbol, so the interpreter resolves it itself */
@@ -674,9 +803,11 @@ export class Linker {
 		}
 		// the host is already instantiated, so its table can be grown now; the library's element
 		// segments write into those slots while it is being instantiated
-		const tableBase = this.vm.growTable(host.index, info.tableSize);
-		this.tableTop.set(host.index, tableBase + info.tableSize);
-		return { memoryBase: alignTo(raw, info.memoryAlignment), tableBase };
+		const recycled = this.takeRun(host.index, info.tableSize);
+		const tableBase = recycled ?? this.vm.growTable(host.index, info.tableSize);
+		if (recycled === null) this.tableTop.set(host.index, tableBase + info.tableSize);
+		// the unaligned block is what free() wants back, not the aligned base the library sees
+		return { memoryBase: alignTo(raw, info.memoryAlignment), tableBase, rawPointer: raw };
 	}
 
 	/**
@@ -703,6 +834,30 @@ export class Linker {
 		return { memoryBase: 0, tableBase: 0, growTo: pages };
 	}
 
+	/**
+	 * @internal takes `count` adjacent slots an unload gave back, or null when no run is that long.
+	 *
+	 * A library's element segments write a contiguous block from `__table_base`, so its slots have to
+	 * come back as a run; the loose slots handed out for individual functions do not.
+	 */
+	private takeRun(tableOwner: number, count: number): number | null {
+		if (count <= 0) return null;
+		const free = this.reusable.get(tableOwner);
+		if (!free || free.length < count) return null;
+
+		const sorted = [...free].sort((a, b) => a - b);
+		for (let i = 0; i + count <= sorted.length; i++) {
+			if ((sorted[i + count - 1] as number) - (sorted[i] as number) !== count - 1) continue;
+			const run = new Set(sorted.slice(i, i + count));
+			this.reusable.set(
+				tableOwner,
+				free.filter((slot) => !run.has(slot))
+			);
+			return sorted[i] as number;
+		}
+		return null;
+	}
+
 	/** @internal answers one GOT entry, or null when nothing defines the symbol */
 	private resolveGot(
 		entry: DylinkImport,
@@ -717,7 +872,10 @@ export class Linker {
 			if (exports.get(entry.field) === 'function') return this.pointerFor(index, entry.field);
 			if (!host) return null;
 			const known = this.definitions.get(entry.field);
-			if (known?.kind === 'function') return this.pointerFor(known.owner, entry.field);
+			if (known?.kind === 'function') {
+				this.loading?.add(known.owner);
+				return this.pointerFor(known.owner, entry.field);
+			}
 			if (host.has(entry.field)) return this.pointerFor(host.index, entry.field);
 			return null;
 		}
@@ -728,7 +886,10 @@ export class Linker {
 		if (offset !== undefined) return memoryBase + offset;
 		if (!host) return null;
 		const known = this.definitions.get(entry.field);
-		if (known?.kind === 'data' && known.address !== undefined) return known.address;
+		if (known?.kind === 'data' && known.address !== undefined) {
+			this.loading?.add(known.owner);
+			return known.address;
+		}
 		return this.vm.globalValue(host.index, entry.field);
 	}
 
@@ -746,9 +907,19 @@ export class Linker {
 		const cached = this.slots.get(key);
 		if (cached !== undefined) return cached;
 
-		const slot = this.tableTop.get(tableOwner) ?? 0;
-		this.tableTop.set(tableOwner, slot + 1);
+		const recycled = this.reusable.get(tableOwner);
+		const reused = recycled?.pop();
+		let slot: number;
+		if (reused !== undefined) {
+			slot = reused;
+		} else {
+			slot = this.tableTop.get(tableOwner) ?? 0;
+			this.tableTop.set(tableOwner, slot + 1);
+		}
 		this.slots.set(key, slot);
+		const held = this.slotsByModule.get(owner);
+		if (held) held.push({ key, tableOwner, slot });
+		else this.slotsByModule.set(owner, [{ key, tableOwner, slot }]);
 		this.pending.push({ tableOwner, slot, owner, name });
 		return slot;
 	}

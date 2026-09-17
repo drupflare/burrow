@@ -170,4 +170,215 @@ describe('load failures', () => {
 			expect((e as InterpretError).code).toBe('burrow.interpret.load_failed');
 		}
 	});
+
+	it('refuses a SIMD guest at load, naming SIMD rather than trapping later', async () => {
+		const vm = await fresh();
+		// a v128 local is what toolchain output declares, and it is what the check reads; wasm3
+		// compiles lazily, so without this the guest loads and the first call dies with "unknown
+		// label", which says nothing about why
+		const simd = await wat(`(module
+		  (memory 1)
+		  (func (export "f") (result i32)
+		    (local $v v128)
+		    (local.set $v (i32x4.add (v128.const i32x4 1 2 3 4) (v128.const i32x4 10 20 30 40)))
+		    (v128.store (i32.const 0) (local.get $v))
+		    (i32.load (i32.const 0))))`);
+		try {
+			vm.load(simd);
+			expect.unreachable('a guest the interpreter cannot execute must not load');
+		} catch (e) {
+			expect((e as InterpretError).code).toBe('burrow.interpret.unsupported');
+			expect((e as InterpretError).message).toContain('SIMD');
+		}
+	});
+});
+
+describe('the memory ceiling', () => {
+	const PAGE = 65536;
+	const GROWER = `(module
+	  (memory (export "m") 1)
+	  (func (export "grow") (param i32) (result i32) (memory.grow (local.get 0)))
+	  (func (export "poke") (param i32) (result i32)
+	    (i32.store (local.get 0) (i32.const 7))
+	    (i32.load (local.get 0))))`;
+
+	it('lets a guest grow freely when no ceiling is set', async () => {
+		const vm = await createInterpreter({ module });
+		const guest = vm.load(await wat(GROWER));
+		expect(guest.call('grow', 16)).toBe(1);
+		expect(guest.call('poke', 17 * PAGE - 4)).toBe(7);
+	});
+
+	it('stops backing memory past the ceiling, and the access is what fails', async () => {
+		const vm = await createInterpreter({ module, maxMemoryBytes: 4 * PAGE });
+		const guest = vm.load(await wat(GROWER));
+
+		// wasm3 clamps rather than refusing, so the guest is told the growth succeeded
+		expect(guest.call('grow', 16)).toBe(1);
+		// and learns otherwise at the first access past what was actually allocated
+		expect(() => guest.call('poke', 17 * PAGE - 4)).toThrow(InterpretError);
+		// memory inside the ceiling still works, so the cap bounds rather than breaks the guest
+		expect(guest.call('poke', 2 * PAGE)).toBe(7);
+	});
+});
+
+/**
+ * The vendored wasm3 carries a patch that folds a loop's affine induction update into its back edge,
+ * so loop compilation is no longer stock and a miscompile here would be silent and guest-specific.
+ *
+ * V8 is the oracle rather than a hand-computed constant: the same bytes run both ways and the answers
+ * have to agree. That catches a wrong fold without anyone predicting what wrong would look like.
+ */
+describe('loops, against V8 running the same bytes', () => {
+	const LOOPS = `(module
+	  (func (export "counted") (param $n i32) (result i32)
+	    (local $i i32) (local $acc i32)
+	    (block $done (loop $l
+	      (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
+	      (local.set $acc (i32.add (local.get $acc) (local.get $i)))
+	      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+	      (br $l)))
+	    (local.get $acc))
+	  (func (export "readAfter") (param $n i32) (result i32)
+	    (local $i i32)
+	    (block $done (loop $l
+	      (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
+	      (local.set $i (i32.add (local.get $i) (i32.const 3)))
+	      (br $l)))
+	    (local.get $i))
+	  (func (export "varyingStride") (param $n i32) (result i32)
+	    (local $i i32) (local $step i32)
+	    (local.set $step (i32.const 1))
+	    (block $done (loop $l
+	      (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
+	      (local.set $i (i32.add (local.get $i) (local.get $step)))
+	      (local.set $step (i32.add (local.get $step) (i32.const 1)))
+	      (br $l)))
+	    (local.get $i))
+	  (func (export "earlyExit") (param $n i32) (result i32)
+	    (local $i i32)
+	    (block $done (loop $l
+	      (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
+	      (br_if $done (i32.eq (local.get $i) (i32.const 7)))
+	      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+	      (br $l)))
+	    (local.get $i))
+	  (func (export "bodyWritesInduction") (param $n i32) (result i32)
+	    (local $i i32) (local $acc i32)
+	    (block $done (loop $l
+	      (br_if $done (i32.ge_s (local.get $i) (local.get $n)))
+	      (if (i32.eq (i32.rem_s (local.get $i) (i32.const 5)) (i32.const 0))
+	        (then (local.set $i (i32.add (local.get $i) (i32.const 2)))))
+	      (local.set $acc (i32.add (local.get $acc) (local.get $i)))
+	      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+	      (br $l)))
+	    (local.get $acc))
+	  (func (export "nestedSharing") (param $n i32) (result i32)
+	    (local $i i32) (local $j i32) (local $acc i32)
+	    (block $outer (loop $ol
+	      (br_if $outer (i32.ge_s (local.get $i) (local.get $n)))
+	      (local.set $j (local.get $i))
+	      (block $inner (loop $il
+	        (br_if $inner (i32.ge_s (local.get $j) (local.get $n)))
+	        (local.set $acc (i32.add (local.get $acc) (i32.const 1)))
+	        (local.set $j (i32.add (local.get $j) (i32.const 1)))
+	        (br $il)))
+	      (local.set $i (i32.add (local.get $i) (i32.const 1)))
+	      (br $ol)))
+	    (local.get $acc))
+	)`;
+
+	const SHAPES = [
+		'counted',
+		'readAfter',
+		'varyingStride',
+		'earlyExit',
+		'bodyWritesInduction',
+		'nestedSharing'
+	] as const;
+	// zero and one exercise the loop that never runs and the one that runs once, where a fold that
+	// updates before testing goes wrong first
+	const ARGS = [0, 1, 2, 7, 33, 100];
+
+	it('answers what V8 answers, on every shape and argument', async () => {
+		const bytes = await wat(LOOPS);
+		const Module = WebAssembly.Module as unknown as new (b: BufferSource) => WebAssembly.Module;
+		const native = (await WebAssembly.instantiate(new Module(bytes), {}))
+			.exports as unknown as Record<(typeof SHAPES)[number], (n: number) => number>;
+		const vm = await fresh();
+		const guest = vm.load(bytes);
+
+		// an oracle test agrees when both sides return nothing, so anchor one answer absolutely
+		expect(guest.call('counted', 100)).toBe(4950);
+		// and the interpreter must actually be fusing, or this compares two unfused paths
+		expect(vm.fusedSequences).toBeGreaterThan(0);
+
+		for (const shape of SHAPES) {
+			for (const n of ARGS) {
+				expect([shape, n, guest.call(shape, n)]).toEqual([shape, n, native[shape](n)]);
+			}
+		}
+	});
+});
+
+/**
+ * Every entry point answers a negative return code from the shim with a coded error rather than a
+ * bare throw or a silent wrong answer. A module index the shim has never issued reaches all of them
+ * through one door, since `at()` rejects it.
+ */
+describe('a module index the interpreter never issued', () => {
+	const ABSENT = 999;
+
+	it('is refused by every entry point that takes one', async () => {
+		const vm = await fresh();
+		const attempts: [string, () => unknown][] = [
+			['instantiate', () => vm.instantiate(ABSENT)],
+			['nameModule', () => vm.nameModule(ABSENT, 'env')],
+			['runStart', () => vm.runStart(ABSENT)],
+			['unload', () => vm.unload(ABSENT)],
+			['growMemory', () => vm.growMemory(ABSENT, 1)],
+			['growTable', () => vm.growTable(ABSENT, 1)],
+			['tableSizeThenPut', () => vm.tablePut(ABSENT, 0, ABSENT, 'f')],
+			['tableClear', () => vm.tableClear(ABSENT, 0, 1)],
+			['linkGlobal', () => vm.linkGlobal(ABSENT, 'env', 'g', 1)],
+			[
+				'linkFunction',
+				() => vm.linkFunction(ABSENT, 'env', 'f', { signature: 'v()', fn: () => 0 })
+			],
+			[
+				'reserveImport',
+				() => vm.reserveImport(ABSENT, 'env', 'f', { signature: 'v()', fn: () => 0 })
+			]
+		];
+
+		for (const [name, attempt] of attempts) {
+			try {
+				attempt();
+				expect.unreachable(`${name} accepted a module index that does not exist`);
+			} catch (e) {
+				expect(e, name).toBeInstanceOf(InterpretError);
+			}
+		}
+	});
+
+	it('answers null for a global rather than throwing, because absence is not an error', async () => {
+		const vm = await fresh();
+		expect(vm.globalValue(ABSENT, 'anything')).toBeNull();
+	});
+
+	it('refuses an import id that was never reserved', async () => {
+		const vm = await fresh();
+		expect(() => vm.bindImport(ABSENT)).toThrow(InterpretError);
+	});
+
+	it('answers -1 rather than throwing when asked where an absent function sits', async () => {
+		const vm = await fresh();
+		expect(vm.tableFind(ABSENT, ABSENT, 'f')).toBe(-1);
+	});
+
+	it('does nothing when asked to clear no slots at all', async () => {
+		const vm = await fresh();
+		// the guard runs before the shim, so an empty range on a bad module is still not an error
+		expect(() => vm.tableClear(ABSENT, 0, 0)).not.toThrow();
+	});
 });

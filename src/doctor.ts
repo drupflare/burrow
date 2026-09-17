@@ -172,7 +172,57 @@ export function inspectWasm(bytes: Uint8Array, path?: string): DoctorReport {
 		});
 	}
 
+	if (usesVector(bytes)) {
+		findings.push({
+			rule: 'wasm-simd',
+			severity: 'fatal',
+			reason:
+				'declares a v128 value; the interpreter implements none of the SIMD proposal, so ' +
+				'the guest fails while its first vector function is compiled. Rebuild without ' +
+				'-msimd128, or run it through the import or publish path'
+		});
+	}
+
 	return report(findings, 'wasm', path);
+}
+
+/**
+ * Whether the module declares a `v128` anywhere the binary format states it exactly.
+ *
+ * Read from the two places a value type is written as structured data: function signatures in the
+ * type section, and the local declarations that open each function body. An opcode scan would also
+ * catch a module that only moves vectors through the operand stack, but distinguishing a `0xfd`
+ * prefix byte from the same byte inside an immediate needs a full instruction decoder, and a check
+ * that guesses is worse than one with a stated edge. Real toolchain output declares vector locals.
+ *
+ * @internal
+ */
+export function usesVector(bytes: Uint8Array): boolean {
+	const types = sectionBody(bytes, 1);
+	if (types?.includes(0x7b)) return true;
+
+	const code = sectionBody(bytes, 10);
+	if (!code) return false;
+
+	let [count, at] = readVaruint(code, 0);
+	if (at < 0) return false;
+	for (let i = 0; i < count; i++) {
+		let size: number;
+		[size, at] = readVaruint(code, at);
+		if (at < 0) return false;
+		const end = at + size;
+		let groups: number;
+		[groups, at] = readVaruint(code, at);
+		if (at < 0) return false;
+		for (let g = 0; g < groups; g++) {
+			[, at] = readVaruint(code, at);
+			if (at < 0 || at >= end) return false;
+			if (code[at] === 0x7b) return true;
+			at++;
+		}
+		at = end;
+	}
+	return false;
 }
 
 function report(findings: Finding[], kind: DoctorReport['kind'], path?: string): DoctorReport {

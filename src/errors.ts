@@ -82,6 +82,7 @@ export class InterpretError extends BurrowError {
 		| 'burrow.interpret.init_failed'
 		| 'burrow.interpret.load_failed'
 		| 'burrow.interpret.link_failed'
+		| 'burrow.interpret.unsupported'
 		| 'burrow.interpret.trap';
 
 	constructor(message: string, code: InterpretError['code'], options?: { cause?: unknown }) {
@@ -102,7 +103,9 @@ export class DylinkError extends BurrowError {
 		| 'burrow.dylink.malformed'
 		| 'burrow.dylink.unresolved'
 		| 'burrow.dylink.no_space'
-		| 'burrow.dylink.link_failed';
+		| 'burrow.dylink.link_failed'
+		| 'burrow.dylink.in_use'
+		| 'burrow.dylink.host_access_denied';
 	/** the symbols nothing resolved, empty unless `code` is `burrow.dylink.unresolved` */
 	readonly unresolved: readonly string[];
 
