@@ -107,6 +107,7 @@
 		"typedoc": "^0.28.20",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.0",
+		"wabt": "^1.0.39",
 		"wasmoon": "^1.16.0",
 		"wrangler": "^4.20.0"
 	},
