@@ -67,10 +67,12 @@ jobs:
           SNAPSHOT="${VERSION}-${GITHUB_SHA::7}"
           npm version "$SNAPSHOT" --no-git-tag-version
           echo "version=$SNAPSHOT" >> $GITHUB_OUTPUT
+      - name: Build
+        run: bun run build
       - name: Publish to GitHub Packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --tag snapshot
       - name: Snapshot to Job Summary
         if: always()
         env:
