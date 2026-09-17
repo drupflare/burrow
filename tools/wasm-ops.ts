@@ -20,6 +20,8 @@ export interface Op {
 	at: number;
 	/** how deep in blocks this instruction sits; a proxy for loop weight */
 	depth: number;
+	/** the callee's module-wide function index, on `call` only */
+	index?: number;
 }
 
 /** the opcodes worth naming: everything a compiler emits in volume */
@@ -207,7 +209,14 @@ export function readOps(body: Uint8Array): Op[] {
 				if (at >= 0) at = skipLeb(body, at);
 				break;
 			case Imm.Leb:
-				at = skipLeb(body, at);
+				if (code === 0x10) {
+					let index: number;
+					[index, at] = leb(body, at);
+					if (at < 0) return ops;
+					(ops[ops.length - 1] as Op).index = index;
+				} else {
+					at = skipLeb(body, at);
+				}
 				break;
 			case Imm.F32:
 				at += 4;
@@ -221,6 +230,56 @@ export function readOps(body: Uint8Array): Op[] {
 		if (at < 0) return ops;
 	}
 	return ops;
+}
+
+/**
+ * How many functions the module imports.
+ *
+ * A `call` immediate indexes imports first and defined functions after, so this is the offset that
+ * maps one onto `readFunctionBodies`.
+ */
+export function countImportedFunctions(wasm: Uint8Array): number {
+	let imported = 0;
+	if (wasm.length < 8) return imported;
+
+	let at = 8;
+	while (at < wasm.length) {
+		const id = wasm[at++] as number;
+		let size: number;
+		[size, at] = leb(wasm, at);
+		if (at < 0) return imported;
+		const end = at + size;
+		if (id === 2) {
+			let count: number;
+			let cursor: number;
+			[count, cursor] = leb(wasm, at);
+			if (cursor < 0) return imported;
+			for (let i = 0; i < count; i++) {
+				for (const _ of [0, 1]) {
+					let length: number;
+					[length, cursor] = leb(wasm, cursor);
+					if (cursor < 0) return imported;
+					cursor += length;
+				}
+				const kind = wasm[cursor++] as number;
+				if (kind === 0x00) {
+					imported++;
+					cursor = skipLeb(wasm, cursor); // type index
+				} else if (kind === 0x03) {
+					cursor += 2; // global: value type, then mutability
+				} else {
+					if (kind === 0x01) cursor++; // table: element type, then limits
+					const flags = wasm[cursor++] as number;
+					cursor = skipLeb(wasm, cursor);
+					if (cursor >= 0 && flags === 0x01) cursor = skipLeb(wasm, cursor);
+				}
+				if (cursor < 0) return imported;
+			}
+			return imported;
+		}
+		at = end;
+	}
+	return imported;
 }
 
 /** Every function body in a module, in index order, as opcode sequences. */
