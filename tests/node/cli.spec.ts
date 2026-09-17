@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	EXIT,
 	exitCodeFor,
@@ -274,5 +274,33 @@ describe('run probe', () => {
 		const h = harness({ 'a.js': 'x' }, CREDS);
 		await run(h.ctx, ['--json', 'probe', 'a.js']);
 		expect(JSON.parse(h.text()).scriptName).toBe('burrow-probe-t');
+	});
+});
+
+/**
+ * The entry point itself, which is the wiring `run` is deliberately kept free of: real file reads,
+ * real streams, the process environment and the version read out of package.json. Nothing here has
+ * behaviour, but an unexercised entry point is how a package ships a binary that throws on startup.
+ */
+describe('the executable entry', () => {
+	it('wires real I/O and answers an exit code', async () => {
+		const argv = process.argv;
+		const written: string[] = [];
+		const stdout = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+			written.push(String(chunk));
+			return true;
+		});
+		process.argv = [argv[0] as string, 'burrow', 'version'];
+
+		try {
+			await import('../../src/bin/burrow.js');
+			expect(process.exitCode).toBe(EXIT.OK);
+			// the version comes from package.json through the real reader, so a broken path shows here
+			expect(written.join('')).toMatch(/\d+\.\d+\.\d+/);
+		} finally {
+			stdout.mockRestore();
+			process.argv = argv;
+			process.exitCode = 0;
+		}
 	});
 });

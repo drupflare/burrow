@@ -219,7 +219,9 @@ describe.skipIf(!HAVE_EMCC)('an extension linked into a host runtime', () => {
 	async function link() {
 		const vm = await createInterpreter({ module: wasm3 });
 		const host = vm.load(hostWasm);
-		const lib = createLinker(vm, { host }).load(extWasm, { name: 'ext' });
+		const lib = createLinker(vm, { host, allowHostAccess: true }).load(extWasm, {
+			name: 'ext'
+		});
 		return { host, lib };
 	}
 
