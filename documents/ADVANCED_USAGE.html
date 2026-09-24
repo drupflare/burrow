@@ -1,5 +1,5 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ADVANCED_USAGE | @drupflare/burrow - v1.0.0</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
-<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.0.0</a>
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ADVANCED_USAGE | @drupflare/burrow - v1.1.0</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.1.0</a>
 <div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
 <ul role="listbox" id="tsd-search-results"></ul>
 <div id="tsd-search-status" aria-live="polite" aria-atomic="true">
@@ -18,6 +18,7 @@
 <li><a href="#dynamic-linking">Dynamic Linking</a></li>
 <li><a href="#the-performance-law">The Performance Law</a></li>
 <li><a href="#memory-budgeting">Memory Budgeting</a></li>
+<li><a href="#parallel-lanes">Parallel Lanes</a></li>
 <li><a href="#security">Security</a></li>
 <li><a href="#things-that-will-bite-you">Things That Will Bite You</a></li>
 </ul>
@@ -436,6 +437,358 @@ for its lifetime, which is what makes a REPL keep its state.</p>
 <p>A boot that cannot fit because everything resident is leased throws <code>BudgetError</code> rather than
 evicting something in use. The failure to avoid is an isolate OOM, which takes down the whole
 Durable Object rather than one request.</p>
+<h2 id="parallel-lanes" class="tsd-anchor-link">Parallel Lanes<a href="#parallel-lanes" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>A Worker isolate has one execution context: <code>Worker</code> is undefined, <code>navigator.hardwareConcurrency</code>
+is 1 and <code>Atomics.wait</code> throws, all tested on a deployed Worker. Distinct Durable Objects of the
+same
+class run concurrently, so a job split across objects gets parallel CPU and aggregate memory. Lanes
+share no memory; slices exchange bytes.</p>
+<h3 id="setup" class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>defineLane</code> returns the Durable Object class. One class serves every role the pool needs: lanes,
+spares, coordinators, sync objects and channel brokers are instances of it under separate ids, so a
+consumer adds one export, one binding and one migration. The class must be SQLite-backed, because
+sync objects keep their state in SQL.</p>
+<pre><code class="ts"><span class="hl-3">import</span><span class="hl-1"> { </span><span class="hl-4">defineLane</span><span class="hl-1"> } </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow/parallel&#39;</span><span class="hl-1">;</span><br/><span class="hl-3">import</span><span class="hl-1"> </span><span class="hl-4">wasm3</span><span class="hl-1"> </span><span class="hl-3">from</span><span class="hl-1"> </span><span class="hl-2">&#39;@drupflare/burrow/vendor/wasm3.wasm&#39;</span><span class="hl-1">;</span><br/><br/><span class="hl-3">export</span><span class="hl-1"> </span><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">BurrowLane</span><span class="hl-1"> = </span><span class="hl-0">defineLane</span><span class="hl-1">({</span><br/><span class="hl-1">  </span><span class="hl-4">interpreter:</span><span class="hl-1"> </span><span class="hl-4">wasm3</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-4">tasks:</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-9">// named tasks run at native speed; the body is ordinary code from this bundle</span><br/><span class="hl-1">    </span><span class="hl-0">checksum</span><span class="hl-4">:</span><span class="hl-1"> (</span><span class="hl-4">input</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> </span><span class="hl-4">input</span><span class="hl-1">.</span><span class="hl-0">reduce</span><span class="hl-1">((</span><span class="hl-4">a</span><span class="hl-1">, </span><span class="hl-4">b</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> (</span><span class="hl-4">a</span><span class="hl-1"> + </span><span class="hl-4">b</span><span class="hl-1">) &gt;&gt;&gt; </span><span class="hl-8">0</span><span class="hl-1">, </span><span class="hl-8">0</span><span class="hl-1">)</span><br/><span class="hl-1">  },</span><br/><span class="hl-1">  </span><span class="hl-0">prepare</span><span class="hl-4">:</span><span class="hl-1"> </span><span class="hl-5">async</span><span class="hl-1"> (</span><span class="hl-4">ctx</span><span class="hl-1">, </span><span class="hl-4">have</span><span class="hl-1">, </span><span class="hl-4">want</span><span class="hl-1">) </span><span class="hl-5">=&gt;</span><span class="hl-1"> {</span><br/><span class="hl-1">    </span><span class="hl-9">// seed ctx.storage until this lane holds `want`, then answer the tags it now holds</span><br/><span class="hl-1">    </span><span class="hl-3">return</span><span class="hl-1"> { ...</span><span class="hl-4">have</span><span class="hl-1">, ...</span><span class="hl-4">want</span><span class="hl-1"> };</span><br/><span class="hl-1">  }</span><br/><span class="hl-1">});</span>
+</code><button type="button">Copy</button></pre>
+
+<p>An existing Durable Object class, such as a replica that already holds the data a slice needs, can
+serve slices without becoming a second class by forwarding its <code>fetch</code> to
+<code>handleLaneRequest(this.ctx, this.env, request, config)</code>.</p>
+<h3 id="work-kinds" class="tsd-anchor-link">Work Kinds<a href="#work-kinds" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Work</th>
+<th>The lane</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>{ guest, fn, args?, input? }</code></td>
+<td>loads the guest, writes <code>input</code> at its <code>alloc</code> export, calls <code>fn(ptr, len, ...args)</code></td>
+<td>the i32, or bytes with <code>result: 'bytes'</code></td>
+</tr>
+<tr>
+<td><code>{ task, input?, channels? }</code></td>
+<td>calls the named task with <code>(input, ctx)</code></td>
+<td>the return value, encoded by type</td>
+</tr>
+<tr>
+<td><code>{ runtime, source?, files? }</code></td>
+<td>instantiates the runtime for this slice, evaluates, discards</td>
+<td><code>RunResult</code> on <code>result.run</code></td>
+</tr>
+<tr>
+<td><code>{ runtime, source, affinity }</code></td>
+<td>keeps a session on the lane chosen by <code>affinity</code> between slices</td>
+<td><code>RunResult</code>; state carries</td>
+</tr>
+</tbody>
+</table>
+<p>A guest that imports host functions is refused with <code>burrow.parallel.impure</code> unless the work says
+<code>idempotent: true</code>, because hedging and retries can run a slice twice. A <code>bytes</code> result is a pointer
+to a little-endian <code>u32</code> length followed by that many bytes.</p>
+<h3 id="scheduling" class="tsd-anchor-link">Scheduling<a href="#scheduling" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ul>
+<li><strong>Pull by default.</strong> Idle lanes take the next slice. On a deployed prototype of this scheduler, a
+1 s job at 16 lanes spanned 121 ms against 160 ms for static assignment, with the slowest rep at
+181 against 500.</li>
+<li><strong>Locality first.</strong> Each pending slice goes to the idle lane that satisfies its <code>requires</code>, with
+the most <code>prefers</code> matches, avoiding an isolate that is already running a slice, then in rotation
+order. The pool learns each lane's tags and isolate from every answer, <code>health()</code> and <code>prepare()</code>,
+and lanes it has not heard from count as eligible. Static assignment ignores placement.</li>
+<li><strong>Over-partitioning.</strong> A single <code>input</code> is split into twice as many chunks as there are lanes;
+pass <code>split</code> or pre-chunked <code>inputs</code> for records.</li>
+<li><strong>Deadline hedge.</strong> Once a quarter of the slices are in, a slice running past three times the
+median, or <code>hedgeFloorMs</code> (250 ms) if that is longer, is duplicated onto a spare and the first
+good answer wins. Before a quarter are in, the deadline is eight times the floor.</li>
+<li><strong>Retries</strong> go to a spare. <code>impure</code>, <code>unknown_task</code> and <code>frame_malformed</code> are never retried. A
+failure that implicates the lane itself, such as an allocation failure, retires that lane id for
+every later job from the same isolate.</li>
+<li><strong>Sticky slices</strong> (<code>affinity</code>) are never hedged or moved; their failure is <code>sticky_failed</code>.</li>
+<li><strong>A stall timer</strong> (<code>stallMs</code>, 30 s) bounds every lane call.</li>
+<li><strong>Coordinator.</strong> By default a job is handed to a coordinator object that runs the scheduler and
+streams results back. On the free plan a Worker was measured refused at 10 ms of CPU once its
+burst was spent, while an object was not. <code>coordinator: false</code> schedules in the caller.</li>
+<li>Every call records <code>pool.lastStats</code>: requests, hedges, retries, span and slice times, background
+catch-ups, the number of commits, the time spent inside <code>commit</code> and a build's <code>publish</code>, and the
+rows <code>commit</code> reported writing. Commit time is where a primary becoming the bottleneck shows
+first.</li>
+</ul>
+<h3 id="exactly-once" class="tsd-anchor-link">Exactly Once<a href="#exactly-once" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The pool accepts one result per slice. A task run with <code>effects: 'capture'</code> records <code>ctx.effect(op)</code>
+calls instead of applying them, and the pool's <code>commit</code> receives them once per accepted slice; the
+write-set of a losing hedge or a failed attempt is discarded. On a deployed Worker, with every
+primary held past the deadline so that primary and hedge both finished, 16 hedged slices per job
+produced exactly 16 commits in 3 of 3 jobs.</p>
+<p>A slice is marked accepted before <code>commit</code> runs, so a <code>commit</code> that throws is never retried into a
+second apply. Instead the job stops and rejects with <code>commit_failed</code>: <code>slices</code> names the slice whose
+commit threw and <code>committed</code> lists, in order, every slice applied before it. Nothing after the
+failure is committed, so recovery resumes from exactly that list. <code>commit</code> can answer the number of
+rows it wrote, and the pool sums them into <code>lastStats.rowsWritten</code>; burrow cannot count rows written
+by the caller's own code any other way.</p>
+<p><code>build</code> separates computing from publishing: each accepted result is staged, and <code>publish</code> runs
+once, only if every slice staged and passed <code>validate</code>. Otherwise it throws <code>build_incomplete</code>
+naming the slices and the previous output keeps serving whole. On a deployed prototype with 34
+synthetic pages at measured render costs, staged publication was visible 10-16x sooner than a
+serial fill and no reader saw a mixed set.</p>
+<p>Retiring the previous generation costs rows. Cloudflare's Durable Objects pricing counts deletes as
+rows written, and deleting the old generation added one row per page: 104 rows per 34-page build
+against 70 for two slots per path, where the next build overwrites the older slot. See
+<a href="#workloads">Workloads</a>.</p>
+<h3 id="stateful-lanes" class="tsd-anchor-link">Stateful Lanes<a href="#stateful-lanes" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>A slice with <code>requires: { generation: 42 }</code> is placed only on a lane known to hold those tags, and
+a lane that turns out not to answers <code>stale_state</code> at once rather than catching up on the serving
+path. When no lane holds the state, the slice fails fast. Either way the scheduler starts the
+lane's <code>prepare</code> in the background (<code>catchUp</code>, on by default), so a later slice finds it ready.
+<code>pool.prepare(want)</code> prepares every lane and spare up front. Spares matter: a hedge or retry of a
+stateful slice lands on one.</p>
+<p><code>prefers</code> is the soft form: <code>{ 'warm:php': true }</code> sends a slice to a lane that already holds a
+sticky PHP session when one is idle, and anywhere otherwise. Lanes report <code>warm:&lt;runtime&gt;</code> for their
+sticky sessions.</p>
+<p><code>prepare</code> runs in the lane's slot, so no slice sees the state change mid-run, and a change of tags
+disposes the lane's sticky runtime sessions, which were built against the old state. A lane reads
+its tags from storage on every request rather than keeping a copy: an object can move between
+isolates, and a copy left in the old isolate would hand <code>prepare</code> a stale <code>have</code> and replay a range
+the lane already holds.</p>
+<p>Replicate state into lanes rather than reading through to a primary. A lane-to-primary query was
+measured at 7 ms p50 on a deployed prototype, so a request with hundreds of queries costs more than
+it saves.</p>
+<p>Warm state belongs in module scope keyed by object id, which <code>defineLane</code> does for sticky runtime
+sessions. On a deployed probe, instance memory was gone after every idle of 15 s or more, while
+module-scope state survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.</p>
+<h3 id="sync" class="tsd-anchor-link">Sync<a href="#sync" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>pool.atomic(key)</code> and <code>ctx.atomic(key)</code> reach one shared number with <code>load</code>, <code>store</code>, <code>add</code> and
+<code>compareExchange</code>, answering as <code>Atomics</code> does. Every op from a slice carries that slice's
+<code>(job, slice)</code> identity, so a hedged or retried slice repeating an op gets the first answer instead
+of applying it again. From the caller, ops apply as sent.</p>
+<p><code>pool.mutex(key).acquire()</code> answers a lease with an increasing fencing token and an expiry
+(<code>ttlMs</code>, 10 s). A holder that never releases loses the lock at expiry and the next waiter is
+granted;
+its later <code>release</code>, <code>read</code> and <code>write</code> fail with <code>lock_lost</code>. Waiters are served first come, first
+served, and <code>timeoutMs</code> bounds the wait with <code>lock_timeout</code>.</p>
+<p><strong>State the lock protects belongs in the lease.</strong> <code>lease.read</code> and <code>lease.write</code> run inside the lock
+object and check its current token. In a deployed prototype, a separate resource that only compares
+tokens it has already seen was measured accepting a dead holder's write in 5 of 5 trials, before the
+new holder had
+written anything.</p>
+<table>
+<thead>
+<tr>
+<th>Op</th>
+<th>Measured on a deployed prototype</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>atomic op</td>
+<td>16-18 ms p50</td>
+</tr>
+<tr>
+<td>lock acquire and release</td>
+<td>39-42 ms p50</td>
+</tr>
+<tr>
+<td>contended lock</td>
+<td>17-21 critical sections per second at 4, 16 and 32 lanes</td>
+</tr>
+</tbody>
+</table>
+<p>A lock is a serial point, so keep it for correctness boundaries and count with atomics.</p>
+<p>Sync state lives in SQLite, so every op is billed as rows written. Measured through the packed
+package from the per-object analytics, 100 ops each:</p>
+<table>
+<thead>
+<tr>
+<th>Op</th>
+<th>Rows written</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>atomic op from the caller</td>
+<td>about 2</td>
+</tr>
+<tr>
+<td>atomic op from a slice, with its op id</td>
+<td>about 5</td>
+</tr>
+<tr>
+<td>lock acquire, one fenced write, release</td>
+<td>about 8</td>
+</tr>
+<tr>
+<td>channel, any number of sends, then close</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>At the free plan's 100,000 rows a day that is roughly 20,000 slice-side atomic ops or 12,000 lock
+cycles.</p>
+<h3 id="channels" class="tsd-anchor-link">Channels<a href="#channels" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>pool.channel(name, { capacity })</code> is a bounded queue held by a broker object. A sender waits while
+it is full, a receiver while it is empty, and several of each may attach; each message reaches one
+receiver. <code>close()</code> ends iteration for every receiver once the buffer drains, and a closed name
+stays
+closed. <code>scope.channel(name)</code> picks a fresh name and closes it when the scope ends.</p>
+<pre><code class="ts"><span class="hl-5">await using</span><span class="hl-1"> </span><span class="hl-7">scope</span><span class="hl-1"> = </span><span class="hl-4">pool</span><span class="hl-1">.</span><span class="hl-0">scope</span><span class="hl-1">();</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">pipe</span><span class="hl-1"> = </span><span class="hl-4">scope</span><span class="hl-1">.</span><span class="hl-0">channel</span><span class="hl-1">(</span><span class="hl-2">&#39;frames&#39;</span><span class="hl-1">, { </span><span class="hl-4">capacity:</span><span class="hl-1"> </span><span class="hl-8">64</span><span class="hl-1"> });</span><br/><span class="hl-5">const</span><span class="hl-1"> </span><span class="hl-7">consumer</span><span class="hl-1"> = </span><span class="hl-4">scope</span><span class="hl-1">.</span><span class="hl-0">spawn</span><span class="hl-1">({ </span><span class="hl-4">task:</span><span class="hl-1"> </span><span class="hl-2">&#39;consume&#39;</span><span class="hl-1">, </span><span class="hl-4">channels:</span><span class="hl-1"> { </span><span class="hl-4">in:</span><span class="hl-1"> </span><span class="hl-4">pipe</span><span class="hl-1"> } });</span><br/><span class="hl-3">await</span><span class="hl-1"> </span><span class="hl-4">scope</span><span class="hl-1">.</span><span class="hl-0">spawn</span><span class="hl-1">({ </span><span class="hl-4">task:</span><span class="hl-1"> </span><span class="hl-2">&#39;produce&#39;</span><span class="hl-1">, </span><span class="hl-4">channels:</span><span class="hl-1"> { </span><span class="hl-4">out:</span><span class="hl-1"> </span><span class="hl-4">pipe</span><span class="hl-1"> } });</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Sends from a slice are numbered by <code>(job, slice)</code>, and the broker drops a number it has seen, so a
+retried or hedged producer delivers each message once. A consumer that fails after receiving has
+consumed those messages; a retry sees only what is left.</p>
+<p>Each endpoint is one long request carrying a stream of records. The broker measured 4.3-5.1k
+messages per second from one producer to one consumer on a deployed Worker. In a prototype,
+WebSocket and long-poll channels held idle for 60 s billed both ends for the whole minute. burrow's
+endpoints are open requests in the same way and have not been measured separately, which is why
+channels are scoped.</p>
+<h3 id="nesting" class="tsd-anchor-link">Nesting<a href="#nesting" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>A task can run children with <code>ctx.spawn(work)</code> and <code>ctx.map(work, inputs)</code>. While a lane waits on
+children, a channel or a lock, it gives up its slot, so a child can always be scheduled, even on a
+one-lane pool. The control case, a raw pool created inside a task calling back into its own lane,
+stalls. On a deployed prototype, 4 parents with 4 children each ran in 721 ms against 710 ms flat,
+and without the yield 13-16 of 16 children timed out.</p>
+<h3 id="transport" class="tsd-anchor-link">Transport<a href="#transport" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Slices, results and channel records travel as <code>stub.fetch</code> bodies. The threshold matrix below was
+run
+on a deployed Worker, 3 repetitions per cell, each call to a distinct object.</p>
+<table>
+<thead>
+<tr>
+<th>Concurrent calls x size</th>
+<th>RPC <code>Uint8Array</code> argument</th>
+<th>RPC <code>ReadableStream</code> argument</th>
+<th><code>fetch</code> body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4 x 1 MiB</td>
+<td>12/12</td>
+<td>12/12</td>
+<td>12/12</td>
+</tr>
+<tr>
+<td>8 x 512 KiB</td>
+<td>18/24</td>
+<td>24/24</td>
+<td>24/24</td>
+</tr>
+<tr>
+<td>16 x 512 KiB</td>
+<td>31/48</td>
+<td>39/48</td>
+<td>48/48</td>
+</tr>
+<tr>
+<td>32 x 256 KiB</td>
+<td>69/96</td>
+<td>67/96</td>
+<td>96/96</td>
+</tr>
+<tr>
+<td>32 x 1 MiB</td>
+<td>34/96</td>
+<td>24/96</td>
+<td>96/96</td>
+</tr>
+</tbody>
+</table>
+<p>Failed RPC calls rejected with <code>Network connection lost</code>; an earlier round saw them never answer
+instead. Streams passed as RPC arguments also failed sporadically at 8 x 64 KiB.</p>
+<h3 id="measured-speedup" class="tsd-anchor-link">Measured Speedup<a href="#measured-speedup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>A 64-slice interpreted guest job, exact against a native reference on every run, through the packed
+package on deployed Workers. The lane counts were interleaved in rotating order within each round,
+because separate series drifted: the same one-lane job read 780 ms in one series and 1,240 ms in the
+next. Warm pools with stable names, first round discarded; spans are the coordinator's, and clocks
+on the edge advance in 20 ms steps.</p>
+<table>
+<thead>
+<tr>
+<th>Job at one lane</th>
+<th>Plan</th>
+<th>8 lanes</th>
+<th>16 lanes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.84 s</td>
+<td>paid</td>
+<td>5.6x</td>
+<td>5.3x</td>
+</tr>
+<tr>
+<td>0.85 s</td>
+<td>free</td>
+<td>5.3x</td>
+<td>8.5x</td>
+</tr>
+<tr>
+<td>3.8 s</td>
+<td>paid</td>
+<td>7.2x</td>
+<td>7.8x</td>
+</tr>
+<tr>
+<td>3.2 s</td>
+<td>free</td>
+<td>5.8x</td>
+<td>8.5x</td>
+</tr>
+</tbody>
+</table>
+<p>Per-round ratios for the small paid job ran from 2.5x to 6.3x. Every slice pays a fixed dispatch
+cost, about 23 ms plus 1.6 ms per lane on the prototype, so a short job stops scaling sooner. A pool
+whose ids are new on every job pays object creation instead: slices took about 140 ms p50 against
+40 ms warm, and single slices reached 3.5 s. Keep pool names stable.</p>
+<h3 id="workloads" class="tsd-anchor-link">Workloads<a href="#workloads" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Measured through the packed package on the paid plan, every result checked against a native
+reference.</p>
+<ul>
+<li><strong>Memory isolation.</strong> 8 slices each filling 96 MiB ran on 8 distinct isolates, 768 MiB at once,
+exact in 4 of 4 runs. One isolate refused a 192 MiB <code>Uint8Array</code> with <code>RangeError: Invalid typed array length</code>, so work that needs more than one isolate's heap has to be split across lanes.</li>
+<li><strong>Image transform in a guest.</strong> A 4 MiB RGBA image split into 32 slices and converted to grayscale
+by a 177-byte guest gave exact bytes in 6 of 6 runs, at 750 ms on one lane and 260 ms on 16.
+Moving 4 MiB in and 1 MiB out through the coordinator is most of the remaining time.</li>
+<li><strong>Convergence build.</strong> 34 pages rendered and staged into one site object, then published. Live
+writes left readers seeing a mixed site in 11-12 of every 17-18 polls; staged builds showed no
+mixed or partial read in any poll. Visible time was about 580 ms at 16 lanes against 2,063 ms at
+one, with each of the 34 stages a serial round trip to the site object.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Publishing</th>
+<th>Rows written per 34-page build</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>live writes</td>
+<td>70</td>
+</tr>
+<tr>
+<td>new generation, <code>DELETE</code> the old</td>
+<td>104</td>
+</tr>
+<tr>
+<td>two slots per path, overwrite older</td>
+<td>70</td>
+</tr>
+</tbody>
+</table>
+<h3 id="health" class="tsd-anchor-link">Health<a href="#health" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>pool.health()</code> probes every lane and spare and reports those that share an isolate. Co-resident
+lanes share one thread and one 128 MiB heap, so two heavy runtimes cannot fit together.
+<code>pool.repair()</code> moves all but one member of each group to fresh ids for every later job from the
+same isolate.</p>
+<p><code>autoRepair</code>, on by default, does the same after each job from what the answers already showed,
+without a probe. A probe would cost a subrequest per lane from the caller, and a free-plan Worker
+has 50. Each lane slot is repaired at most once per isolate, so a pool that cannot separate does not
+churn through fresh, cold ids. In a deployed comparison at 16 lanes no co-residency occurred, and
+the medians were 100 ms with it and 120 ms without.</p>
 <h2 id="security" class="tsd-anchor-link">Security<a href="#security" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>burrow exists to run code the deployment never saw, which is arbitrary code execution by design.
 That is a legitimate thing to build: a Drupal host loading its own extensions, a CI service running
@@ -563,6 +916,21 @@ rather than an error.</p>
 <li><a href="#what-the-vendored-interpreter-carries"><span>What the vendored interpreter carries</span></a></li>
 <li><a href="#benchmark-rules"><span>Benchmark <wbr/>Rules</span></a></li></ul></li>
 <li><a href="#memory-budgeting"><span>Memory <wbr/>Budgeting</span></a></li>
+<li><a href="#parallel-lanes"><span>Parallel <wbr/>Lanes</span></a></li>
+<li>
+<ul>
+<li><a href="#setup"><span>Setup</span></a></li>
+<li><a href="#work-kinds"><span>Work <wbr/>Kinds</span></a></li>
+<li><a href="#scheduling"><span>Scheduling</span></a></li>
+<li><a href="#exactly-once"><span>Exactly <wbr/>Once</span></a></li>
+<li><a href="#stateful-lanes"><span>Stateful <wbr/>Lanes</span></a></li>
+<li><a href="#sync"><span>Sync</span></a></li>
+<li><a href="#channels"><span>Channels</span></a></li>
+<li><a href="#nesting"><span>Nesting</span></a></li>
+<li><a href="#transport"><span>Transport</span></a></li>
+<li><a href="#measured-speedup"><span>Measured <wbr/>Speedup</span></a></li>
+<li><a href="#workloads"><span>Workloads</span></a></li>
+<li><a href="#health"><span>Health</span></a></li></ul></li>
 <li><a href="#security"><span>Security</span></a></li>
 <li>
 <ul>
@@ -572,7 +940,7 @@ rather than an error.</p>
 <li><a href="#etiquette"><span>Etiquette</span></a></li></ul></li>
 <li><a href="#things-that-will-bite-you"><span>Things <wbr/>That <wbr/>Will <wbr/>Bite <wbr/>You</span></a></li></ul></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.0.0</a>
+<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.1.0</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
