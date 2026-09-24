@@ -410,12 +410,15 @@ to a little-endian `u32` length followed by that many bytes.
 - **Pull by default.** Idle lanes take the next slice. On a deployed prototype of this scheduler, a
   1 s job at 16 lanes spanned 121 ms against 160 ms for static assignment, with the slowest rep at
   181 against 500.
+- **Locality first.** Each pending slice goes to the idle lane that satisfies its `requires`, with
+  the most `prefers` matches, avoiding an isolate that is already running a slice, then in rotation
+  order. The pool learns each lane's tags and isolate from every answer, `health()` and `prepare()`,
+  and lanes it has not heard from count as eligible. Static assignment ignores placement.
 - **Over-partitioning.** A single `input` is split into twice as many chunks as there are lanes;
   pass `split` or pre-chunked `inputs` for records.
 - **Deadline hedge.** Once a quarter of the slices are in, a slice running past three times the
   median, or `hedgeFloorMs` (250 ms) if that is longer, is duplicated onto a spare and the first
-  good
-  answer wins. Before a quarter are in, the deadline is eight times the floor.
+  good answer wins. Before a quarter are in, the deadline is eight times the floor.
 - **Retries** go to a spare. `impure`, `unknown_task` and `frame_malformed` are never retried. A
   failure that implicates the lane itself, such as an allocation failure, retires that lane id for
   every later job from the same isolate.
@@ -424,9 +427,10 @@ to a little-endian `u32` length followed by that many bytes.
 - **Coordinator.** By default a job is handed to a coordinator object that runs the scheduler and
   streams results back. On the free plan a Worker was measured refused at 10 ms of CPU once its
   burst was spent, while an object was not. `coordinator: false` schedules in the caller.
-- Every call records `pool.lastStats`: requests, hedges, retries, span and slice times, plus the
-  number of commits, the time spent inside `commit` and a build's `publish`, and the rows `commit`
-  reported writing. Commit time is where a primary becoming the bottleneck shows first.
+- Every call records `pool.lastStats`: requests, hedges, retries, span and slice times, background
+  catch-ups, the number of commits, the time spent inside `commit` and a build's `publish`, and the
+  rows `commit` reported writing. Commit time is where a primary becoming the bottleneck shows
+  first.
 
 ### Exactly Once
 
@@ -450,16 +454,22 @@ synthetic pages at measured render costs, staged publication was visible 10-16x 
 serial fill and no reader saw a mixed set.
 
 Retiring the previous generation costs rows. Cloudflare's Durable Objects pricing counts deletes as
-rows written, and in that prototype the flips and old-generation deletes wrote 3.4k of the
-round's rows. Staging into two slots per path and overwriting the older slot on the next build
-avoids the delete; that alternative has not been measured.
+rows written, and deleting the old generation added one row per page: 104 rows per 34-page build
+against 70 for two slots per path, where the next build overwrites the older slot. See
+[Workloads](#workloads).
 
 ### Stateful Lanes
 
-A slice with `requires: { generation: 42 }` runs only on a lane whose tags match; any other lane
-answers `stale_state` at once rather than catching up on the serving path. `pool.prepare(want)` runs
-the `prepare` hook on every lane and spare, off the serving path. Spares matter: a hedge or retry of
-a stateful slice lands on one.
+A slice with `requires: { generation: 42 }` is placed only on a lane known to hold those tags, and
+a lane that turns out not to answers `stale_state` at once rather than catching up on the serving
+path. When no lane holds the state, the slice fails fast. Either way the scheduler starts the
+lane's `prepare` in the background (`catchUp`, on by default), so a later slice finds it ready.
+`pool.prepare(want)` prepares every lane and spare up front. Spares matter: a hedge or retry of a
+stateful slice lands on one.
+
+`prefers` is the soft form: `{ 'warm:php': true }` sends a slice to a lane that already holds a
+sticky PHP session when one is idle, and anywhere otherwise. Lanes report `warm:<runtime>` for their
+sticky sessions.
 
 `prepare` runs in the lane's slot, so no slice sees the state change mid-run, and a change of tags
 disposes the lane's sticky runtime sessions, which were built against the old state. A lane reads
@@ -473,8 +483,7 @@ it saves.
 
 Warm state belongs in module scope keyed by object id, which `defineLane` does for sticky runtime
 sessions. On a deployed probe, instance memory was gone after every idle of 15 s or more, while
-module-scope state
-survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.
+module-scope state survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.
 
 ### Sync
 
@@ -502,6 +511,19 @@ written anything.
 | contended lock           | 17-21 critical sections per second at 4, 16 and 32 lanes |
 
 A lock is a serial point, so keep it for correctness boundaries and count with atomics.
+
+Sync state lives in SQLite, so every op is billed as rows written. Measured through the packed
+package from the per-object analytics, 100 ops each:
+
+| Op                                       | Rows written |
+| ---------------------------------------- | ------------ |
+| atomic op from the caller                | about 2      |
+| atomic op from a slice, with its op id   | about 5      |
+| lock acquire, one fenced write, release  | about 8      |
+| channel, any number of sends, then close | 1            |
+
+At the free plan's 100,000 rows a day that is roughly 20,000 slice-side atomic ops or 12,000 lock
+cycles.
 
 ### Channels
 
@@ -556,24 +578,57 @@ instead. Streams passed as RPC arguments also failed sporadically at 8 x 64 KiB.
 ### Measured Speedup
 
 A 64-slice interpreted guest job, exact against a native reference on every run, through the packed
-package on deployed Workers. Warm means a stable pool name after one warmup; the span is the
-coordinator's, median of five. Clocks on the edge advance in 20 ms steps.
+package on deployed Workers. The lane counts were interleaved in rotating order within each round,
+because separate series drifted: the same one-lane job read 780 ms in one series and 1,240 ms in the
+next. Warm pools with stable names, first round discarded; spans are the coordinator's, and clocks
+on the edge advance in 20 ms steps.
 
-| Lanes | Free plan span | Speedup | Paid plan span | Speedup |
-| ----- | -------------- | ------- | -------------- | ------- |
-| 1     | 1,300 ms       | 1x      | 780 ms         | 1x      |
-| 8     | 160 ms         | 8.1x    | 140 ms         | 5.6x    |
-| 16    | 140 ms         | 9.3x    | 100 ms         | 7.8x    |
+| Job at one lane | Plan | 8 lanes | 16 lanes |
+| --------------- | ---- | ------- | -------- |
+| 0.84 s          | paid | 5.6x    | 5.3x     |
+| 0.85 s          | free | 5.3x    | 8.5x     |
+| 3.8 s           | paid | 7.2x    | 7.8x     |
+| 3.2 s           | free | 5.8x    | 8.5x     |
 
-A pool whose ids are new on every job pays object creation instead: slices took about 140 ms p50
-against 40 ms warm, and single slices reached 3.5 s. Keep pool names stable.
+Per-round ratios for the small paid job ran from 2.5x to 6.3x. Every slice pays a fixed dispatch
+cost, about 23 ms plus 1.6 ms per lane on the prototype, so a short job stops scaling sooner. A pool
+whose ids are new on every job pays object creation instead: slices took about 140 ms p50 against
+40 ms warm, and single slices reached 3.5 s. Keep pool names stable.
+
+### Workloads
+
+Measured through the packed package on the paid plan, every result checked against a native
+reference.
+
+- **Memory isolation.** 8 slices each filling 96 MiB ran on 8 distinct isolates, 768 MiB at once,
+  exact in 4 of 4 runs. One isolate refused a 192 MiB `Uint8Array` with `RangeError: Invalid typed
+array length`, so work that needs more than one isolate's heap has to be split across lanes.
+- **Image transform in a guest.** A 4 MiB RGBA image split into 32 slices and converted to grayscale
+  by a 177-byte guest gave exact bytes in 6 of 6 runs, at 750 ms on one lane and 260 ms on 16.
+  Moving 4 MiB in and 1 MiB out through the coordinator is most of the remaining time.
+- **Convergence build.** 34 pages rendered and staged into one site object, then published. Live
+  writes left readers seeing a mixed site in 11-12 of every 17-18 polls; staged builds showed no
+  mixed or partial read in any poll. Visible time was about 580 ms at 16 lanes against 2,063 ms at
+  one, with each of the 34 stages a serial round trip to the site object.
+
+| Publishing                          | Rows written per 34-page build |
+| ----------------------------------- | ------------------------------ |
+| live writes                         | 70                             |
+| new generation, `DELETE` the old    | 104                            |
+| two slots per path, overwrite older | 70                             |
 
 ### Health
 
-`pool.health()` probes every lane and reports lanes that share an isolate. Co-resident lanes share
-one thread and one 128 MiB heap, so two heavy runtimes cannot fit together. `pool.repair()` moves
-all
-but one lane of each group to fresh ids for every later job from the same isolate.
+`pool.health()` probes every lane and spare and reports those that share an isolate. Co-resident
+lanes share one thread and one 128 MiB heap, so two heavy runtimes cannot fit together.
+`pool.repair()` moves all but one member of each group to fresh ids for every later job from the
+same isolate.
+
+`autoRepair`, on by default, does the same after each job from what the answers already showed,
+without a probe. A probe would cost a subrequest per lane from the caller, and a free-plan Worker
+has 50. Each lane slot is repaired at most once per isolate, so a pool that cannot separate does not
+churn through fresh, cold ids. In a deployed comparison at 16 lanes no co-residency occurred, and
+the medians were 100 ms with it and 120 ms without.
 
 ## Security
 

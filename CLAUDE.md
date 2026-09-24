@@ -5,8 +5,9 @@
 ## Status
 
 1.0.0 is released; 1.1.0 adds `./parallel` and is unreleased. `release.yml` cuts the tag, the
-GitHub release and both registry publishes in one `workflow_dispatch` run, and it is the only way this package reaches npm. Every push to master also
-publishes a per-commit snapshot to GitHub Packages under the `snapshot` dist-tag.
+GitHub release and both registry publishes in one `workflow_dispatch` run, and it is the only way
+this package reaches npm. Every push to master also publishes a per-commit snapshot to GitHub
+Packages under the `snapshot` dist-tag.
 
 ## The things that are load-bearing and non-obvious
 
@@ -40,20 +41,25 @@ A stub must evaluate before the glue. `src/runtime.ts` installs it.
 
 **One isolate has one thread; distinct Durable Objects of one class run in parallel.** `Worker` is
 undefined, `hardwareConcurrency` is 1 and `Atomics.wait` throws, tested deployed. `./parallel`
-imports `cloudflare:workers`, so it is not re-exported from `.` and `tests/exports.spec.ts` pins that.
+imports `cloudflare:workers`, so it is not re-exported from `.`, and `tests/exports.spec.ts` pins
+that.
 
 - **Bytes travel as `stub.fetch` bodies, never RPC arguments.** Deployed matrix: RPC `Uint8Array`
-  args delivered 34/96 and RPC `ReadableStream` args 24/96 at 32 x 1 MiB (`Network connection lost`);
-  fetch bodies 96/96 in every cell. Channels ride fetch streaming bodies for the same reason.
+  args delivered 34/96 and RPC `ReadableStream` args 24/96 at 32 x 1 MiB (`Network connection
+lost`); fetch bodies 96/96 in every cell. Channels ride fetch streaming bodies for the same reason.
 - **Module scope is per isolate and shared by every object in it**; instance memory is evicted after
   ~15 s idle while the isolate lives minutes. Warm state is keyed by object id at module scope.
 - **On the free plan a Worker is refused at 10 ms CPU once its burst is spent; an object is not.**
   That is why the coordinator object is on by default. One coordinator invocation made 66 lane
   requests on free without refusal.
 - **`rowsWritten` counts index writes**, and the free plan's 100k rows/day quota, once spent, makes
-  every sync op and channel close fail until 00:00 UTC. Price rows before a free-account run.
+  every sync op and channel close fail until 00:00 UTC. Measured: an atomic op is ~2 rows from the
+  caller and ~5 from a slice, a lock cycle ~8, a channel 1. Price rows before a free-account run.
 - **A lane waiting on children, a channel or a lock gives up its slot.** Without that, a consumer
   holding a lane deadlocks its producer; the gate has the control.
+- **Co-residency is repaired from answers, never by probing.** A probe costs a subrequest per lane
+  from the caller and a free-plan Worker has 50; each slot is repaired once per isolate so a pool
+  that cannot separate does not churn to cold ids.
 - **Measure on stable pool names.** Fresh ids per job measure object creation: slices ~140 ms p50
   against ~40 ms warm, and single slices to 3.5 s.
 
@@ -111,7 +117,7 @@ Never quote one ratio. Quote the law and the guest's character.
 
 ## Benchmark rules
 
-Three instrument bugs produced confident wrong numbers here. They are rules now:
+Four instrument bugs produced confident wrong numbers here. They are rules now:
 
 1. **A native arm that does not scale with the work is not doing the work.** `acc = acc + 3` repeated
    N times was folded by TurboFan into `acc + 3N`. Assert native time scales with N.
@@ -121,6 +127,10 @@ Three instrument bugs produced confident wrong numbers here. They are rules now:
 3. **State whether iterations are dependent.** Independent iterations measure the interpreter's worst
    case while looking like ordinary code — that property alone moved a hashtable between 20.29x and
    9.54x with nothing else changed.
+
+4. **Interleave the arms of a scaling curve.** Run as separate series, the same one-lane job
+   read 780 ms and then 1,240 ms, and the 16-lane speedup built on it read 7.8x against 5.3x
+   interleaved. Rotate the arms within each round.
 
 **No spec asserts a performance magnitude.** Specs assert properties; deploys produce numbers.
 Absolute figures come from `burrow probe` on a real Worker, because in-worker clocks read 0 on the

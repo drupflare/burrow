@@ -41,6 +41,8 @@ and safety.
 bun add @drupflare/burrow
 ```
 
+The types expect the Workers globals, from `@cloudflare/workers-types` or `wrangler types`.
+
 ## 🚀 Quick Start
 
 ```ts
@@ -192,8 +194,9 @@ export default {
 
 A slice can be guest wasm, a named task from your bundle, or a runtime evaluation. The pool retries
 failures on spare lanes and hedges slow slices, and accepts exactly one result per slice. Measured
-through the packed package on a deployed Worker, a warm 16-lane pool ran an interpreted guest job
-9.3x faster than one lane on the free plan and 7.8x faster on the paid plan.
+through the packed package on deployed Workers, a warm 16-lane pool ran an interpreted guest job
+that takes 3-4 s on one lane 7.8-8.5x faster; shorter jobs scale less, because every slice pays a
+fixed dispatch cost.
 
 `spawn` and `scope` give thread-like handles, `atomic` and `mutex` coordinate lanes, and `channel`
 streams messages between them. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#parallel-lanes) covers the

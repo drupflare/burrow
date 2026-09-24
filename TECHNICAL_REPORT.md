@@ -41,6 +41,11 @@ interpreter ratio, and quoting one produced two wrong numbers before the law bel
 Every dispatch-cost mechanism tried failed, while every semantic-density mechanism paid. And the
 codegen gate is complete within one isolate but says nothing about the platform.
 
+Parallelism leaves the isolate instead. One isolate has one thread, but distinct Durable Objects of
+one class run concurrently, and `@drupflare/burrow/parallel` schedules one job across them: 7.8-8.5x
+at 16 lanes for a 3-4 s interpreted job, 768 MiB held across 8 isolates where one refuses 192 MiB,
+and exactly one commit per slice under forced hedging.
+
 ## The Gate
 
 Every hatch tested against a live deployment, not inferred.
@@ -285,31 +290,54 @@ object id.
 
 ### Through the Package
 
-Release gate 3 ran the packed 1.1.0 tarball on deployed Workers on both plans, every answer checked
-against a native reference. Spans are the coordinator's `Date.now()` across I/O, which advances in
-20 ms steps; warm means a stable pool name after one warmup, median of five.
+Release gate 3 ran the packed 1.1.0 tarball on deployed Workers, every answer checked against a
+native reference. The final build passed all 36 functional runs exactly. Spans are the coordinator's
+`Date.now()` across I/O, which advances in 20 ms steps. Pools were warm with stable names, lane
+counts were interleaved in rotating order within each round, and the first round was discarded.
 
-| Lanes | Free span | Speedup | Paid span | Speedup |
-| ----- | --------- | ------- | --------- | ------- |
-| 1     | 1,300 ms  | 1x      | 780 ms    | 1x      |
-| 8     | 160 ms    | 8.1x    | 140 ms    | 5.6x    |
-| 16    | 140 ms    | 9.3x    | 100 ms    | 7.8x    |
+| Job at one lane | Plan | 8 lanes | 16 lanes |
+| --------------- | ---- | ------- | -------- |
+| 0.84 s          | paid | 5.6x    | 5.3x     |
+| 0.85 s          | free | 5.3x    | 8.5x     |
+| 3.8 s           | paid | 7.2x    | 7.8x     |
+| 3.2 s           | free | 5.8x    | 8.5x     |
 
-A 32-lane job made 66 lane requests from one coordinator invocation on the free plan with no
-refusal. A stateful job with every primary held past the hedge deadline produced 16 hedges and
-exactly 16 commits in 3 of 3 runs. One producer and one consumer moved 5,000 channel messages through
-a broker at 4.3-5.1k per second. A QuickJS runtime isolated fresh slices and carried state 1, 2, 3
-across sticky ones on a single lane.
+An earlier pass measured each lane count as its own series and reported 7.8x paid and 9.3x free at
+16 lanes for the short job. Those figures are withdrawn: the same one-lane job read 780 ms in one
+series and 1,240 ms in the next, and interleaving gave 5.3x and 8.5x.
 
-The gate found four defects that the unit lane could not, each now covered by a gate test: spares
-were never prepared, so every hedge of a stateful slice failed; object failures reached callers as
-untyped errors; a channel close flipped state in memory before its write succeeded; and a retried
-producer sent its messages twice.
+| Workload                                        | Result                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| memory isolation, 8 x 96 MiB                    | 8 distinct isolates, 768 MiB at once, exact 4/4             |
+| one isolate, 192 MiB                            | refused, `RangeError: Invalid typed array length`           |
+| image transform, 4 MiB RGBA to gray in a guest  | exact 6/6; 750 ms on 1 lane, 260 ms on 16, transfer bound   |
+| convergence, 34 pages, live writes              | a mixed site in 11-12 of every 17-18 reader polls           |
+| convergence, 34 pages, staged                   | no mixed or partial read; 580 ms at 16 lanes, 2,063 ms at 1 |
+| old generation deleted vs two slots per path    | 104 against 70 rows written per build                       |
+| stateful job, every primary held past the hedge | 16 hedges, exactly 16 commits, 3/3                          |
+| channel, one producer to one consumer           | 5,000 messages at 4.3-5.1k per second                       |
+| QuickJS runtime                                 | fresh slices isolated; sticky state 1, 2, 3 on one lane     |
+| 32 lanes through one coordinator, free plan     | 66 lane requests in one invocation, none refused            |
+| rows written per sync op, 100 each              | atomic 2 from the caller, 5 from a slice; lock cycle 8      |
+
+The deploy found four defects the unit lane could not: spares were never prepared, so every hedge of
+a stateful slice failed; object failures reached callers as untyped errors; a channel close flipped
+state in memory before its write succeeded; and a retried producer sent its messages twice. A review
+from the first consumer found two more: sticky sessions survived a change of lane state, and a
+module-level tag cache could hand `prepare` a stale view after an object moved between isolates,
+replaying a range the lane already held. Each is covered by a gate test that fails on the old code.
+
+Three runs on the free plan failed with a non-JSON error in the first minute after a fresh deploy,
+and none of 36 did afterwards. The cause was not attributed.
+
+Co-residency is repaired from what jobs already report rather than by a probe, because a probe costs
+a subrequest per lane from the caller and a free-plan Worker has 50. In a deployed comparison at 16
+lanes no co-residency occurred, and medians were 100 ms with automatic repair and 120 ms without.
 
 ### Transport
 
-Release gate 2, deployed, 3 repetitions per cell, each call to a distinct object. Delivered calls out
-of attempted:
+Release gate 2, deployed, 3 repetitions per cell, each call to a distinct object. Delivered
+calls out of attempted:
 
 | Concurrent calls x size | RPC `Uint8Array` argument | RPC `ReadableStream` argument | `fetch` body |
 | ----------------------- | ------------------------- | ----------------------------- | ------------ |
@@ -330,9 +358,9 @@ travel as `stub.fetch` bodies.
   refused at exactly 10 ms of CPU every time, while an object ran 10 of 10 at about 1.5 s.
 - **Reading state through to a primary.** 7 ms p50 per query, 1.4-1.5 s for 200 queries; lanes
   replicate instead.
-- **Fencing with an external resource.** A resource that compares only tokens it has seen accepted a
-  dead holder's write in 5 of 5 trials before the new holder wrote. Protected state lives in the lock
-  object and is checked against its current token.
+- **Fencing with an external resource.** A resource that compares only tokens it has seen accepted
+  a dead holder's write in 5 of 5 trials before the new holder wrote. Protected state lives in the
+  lock object and is checked against its current token.
 - **Long-poll and WebSocket channels.** 21-31 ms and 4 ms round trips, 155 and 3.4-4.7k messages per
   second, against 2 ms and 8.7-9.1k for a point-to-point stream. Idle channels of both kinds billed
   both ends for the whole 60 s held.
@@ -343,7 +371,7 @@ travel as `stub.fetch` bodies.
 
 ## Instrument Rules
 
-Five instrument bugs produced confident wrong numbers here, three of which changed a verdict. The
+Six instrument bugs produced confident wrong numbers here, four of which changed a verdict. The
 `bench` lane asserts the first three as correctness checks.
 
 1. **A native arm that does not scale with the work is not doing the work.** `acc = acc + 3` repeated
@@ -362,7 +390,12 @@ Five instrument bugs produced confident wrong numbers here, three of which chang
    binary.** One round explained an identical counter by inference and was wrong: the gate bit had
    never been compiled in.
 
-A sixth is about the observer. An instrument competing with its own measurement for cores produced an
+6. **Interleave the arms of a scaling curve.** Measured as separate series, the same one-lane job
+   read 780 ms and then 1,240 ms, and the 16-lane ratio built on the first series read 7.8x against
+   5.3x interleaved. Rotating the arms within each round puts drift on every arm equally.
+
+A seventh is about the observer. An instrument competing with its own measurement for cores produced
+an
 A/A of 1.0376 with a MAD of 0.0752, and the contaminant was the agent's own progress polling.
 
 **No spec asserts a performance magnitude.** Specs assert properties; deploys produce numbers, because
