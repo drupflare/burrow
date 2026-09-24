@@ -6,5 +6,12 @@
 	"rules": [
 		{ "type": "CompiledWasm", "globs": ["**/*.wasm"], "fallthrough": true },
 		{ "type": "Data", "globs": ["**/*.bin"], "fallthrough": true }
-	]
+	],
+	"durable_objects": {
+		"bindings": [
+			{ "name": "BURROW_LANES", "class_name": "TestLane" },
+			{ "name": "BARE_LANES", "class_name": "BareLane" }
+		]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["TestLane", "BareLane"] }]
 }

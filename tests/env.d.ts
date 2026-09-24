@@ -12,3 +12,10 @@ declare module '*.bin' {
 	const bytes: ArrayBuffer;
 	export default bytes;
 }
+
+declare namespace Cloudflare {
+	interface Env {
+		BURROW_LANES: DurableObjectNamespace;
+		BARE_LANES: DurableObjectNamespace;
+	}
+}
