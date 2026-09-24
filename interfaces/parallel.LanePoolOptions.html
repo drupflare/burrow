@@ -1,5 +1,5 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>LanePoolOptions | @drupflare/burrow - v1.1.0</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
-<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.1.0</a>
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>LanePoolOptions | @drupflare/burrow - v1.1.1</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.1.1</a>
 <div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
 <ul role="listbox" id="tsd-search-results"></ul>
 <div id="tsd-search-status" aria-live="polite" aria-atomic="true">
@@ -20,7 +20,7 @@
 </div></div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">LanePoolOptions</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#autorepair">autoRepair</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#binding">binding</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#catchup">catchUp</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commit">commit</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><br/>        <span class="tsd-kind-parameter">effects</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">,</span><br/>        <span class="tsd-kind-parameter">ids</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">jobId</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">sliceId</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#coordinator">coordinator</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#coordinators">coordinators</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#hedge">hedge</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#hedgefloorms">hedgeFloorMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#maxattempts">maxAttempts</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#name">name</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#schedule">schedule</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;pull&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;static&quot;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#size">size</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#spares">spares</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#stallms">stallMs</a><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L63">src/parallel/pool.ts:63</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L63">src/parallel/pool.ts:63</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -53,21 +53,21 @@
 once per lane slot; defaults to true. Co-resident lanes share one thread and one heap.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L96">src/parallel/pool.ts:96</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L96">src/parallel/pool.ts:96</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="binding"><code class="tsd-tag">Optional</code><span>binding</span><a href="#binding" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">binding</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>the namespace's binding name, which a coordinator object uses to reach the lanes</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L71">src/parallel/pool.ts:71</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L71">src/parallel/pool.ts:71</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="catchup"><code class="tsd-tag">Optional</code><span>catch<wbr/>Up</span><a href="#catchup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">catchUp</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>prepare a lane in the background when a slice finds it lacking <code>requires</code>; defaults to true</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L91">src/parallel/pool.ts:91</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L91">src/parallel/pool.ts:91</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="commit"><code class="tsd-tag">Optional</code><span>commit</span><a href="#commit" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">commit</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-symbol">(</span><br/>    <span class="tsd-kind-parameter">effects</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-keyword">readonly</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-kind-parameter">ids</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-symbol">{</span> <span class="tsd-kind-property">jobId</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span> <span class="tsd-kind-property">sliceId</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span> <span class="tsd-signature-symbol">}</span><span class="tsd-signature-symbol">,</span><br/><span class="tsd-signature-symbol">)</span> <span class="tsd-signature-symbol">=&gt;</span> <span class="tsd-signature-type">unknown</span></div>
@@ -76,7 +76,7 @@ of rows written to have them counted in <code>stats.rowsWritten</code>. If it th
 rejects with <code>burrow.parallel.commit_failed</code>, whose <code>committed</code> lists what was applied.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L102">src/parallel/pool.ts:102</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L102">src/parallel/pool.ts:102</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="coordinator"><code class="tsd-tag">Optional</code><span>coordinator</span><a href="#coordinator" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">coordinator</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
@@ -85,70 +85,70 @@ on the free plan a Worker was measured refused at 10 ms of CPU once its burst wa
 an object was not refused.</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L77">src/parallel/pool.ts:77</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L77">src/parallel/pool.ts:77</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="coordinators"><code class="tsd-tag">Optional</code><span>coordinators</span><a href="#coordinators" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">coordinators</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>how many coordinator objects to spread jobs across; defaults to 4</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L79">src/parallel/pool.ts:79</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L79">src/parallel/pool.ts:79</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="hedge"><code class="tsd-tag">Optional</code><span>hedge</span><a href="#hedge" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">hedge</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">boolean</span></div>
 <div class="tsd-comment tsd-typography"><p>duplicate a slice that runs past three times the median onto a spare; defaults to true</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L83">src/parallel/pool.ts:83</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L83">src/parallel/pool.ts:83</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="hedgefloorms"><code class="tsd-tag">Optional</code><span>hedge<wbr/>Floor<wbr/>Ms</span><a href="#hedgefloorms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">hedgeFloorMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>the shortest deadline a hedge waits for; defaults to 250 ms</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L89">src/parallel/pool.ts:89</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L89">src/parallel/pool.ts:89</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="maxattempts"><code class="tsd-tag">Optional</code><span>max<wbr/>Attempts</span><a href="#maxattempts" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">maxAttempts</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>attempts per slice, the first included; defaults to 3</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L85">src/parallel/pool.ts:85</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L85">src/parallel/pool.ts:85</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="name"><code class="tsd-tag">Optional</code><span>name</span><a href="#name" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">name</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>names the pool's lane ids, so two pools on one namespace do not share lanes; defaults to <code>burrow</code></p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L65">src/parallel/pool.ts:65</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L65">src/parallel/pool.ts:65</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="schedule"><code class="tsd-tag">Optional</code><span>schedule</span><a href="#schedule" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">schedule</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">&quot;pull&quot;</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">&quot;static&quot;</span></div>
 <div class="tsd-comment tsd-typography"><p><code>pull</code> lets idle lanes take the next slice; measured faster than <code>static</code> at 16 lanes</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L81">src/parallel/pool.ts:81</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L81">src/parallel/pool.ts:81</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="size"><code class="tsd-tag">Optional</code><span>size</span><a href="#size" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">size</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>how many lanes; defaults to 8</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L67">src/parallel/pool.ts:67</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L67">src/parallel/pool.ts:67</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="spares"><code class="tsd-tag">Optional</code><span>spares</span><a href="#spares" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">spares</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>lanes held back for hedges and retries; defaults to a quarter of <code>size</code>, at least 2</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L69">src/parallel/pool.ts:69</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L69">src/parallel/pool.ts:69</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="stallms"><code class="tsd-tag">Optional</code><span>stall<wbr/>Ms</span><a href="#stallms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">stallMs</span><span class="tsd-signature-symbol">?:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>a lane call with no answer after this long counts as failed; defaults to 30 s</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/pool.ts#L87">src/parallel/pool.ts:87</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/e30eebdbf3222a1eff705a146da61930622ae0d1/src/parallel/pool.ts#L87">src/parallel/pool.ts:87</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
@@ -167,7 +167,7 @@ an object was not refused.</p>
 <details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Properties"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Properties</summary>
 <div><a href="#autorepair"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>auto<wbr/>Repair</span></a><a href="#binding"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>binding</span></a><a href="#catchup"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>catch<wbr/>Up</span></a><a href="#commit"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>commit</span></a><a href="#coordinator"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>coordinator</span></a><a href="#coordinators"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>coordinators</span></a><a href="#hedge"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>hedge</span></a><a href="#hedgefloorms"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>hedge<wbr/>Floor<wbr/>Ms</span></a><a href="#maxattempts"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>max<wbr/>Attempts</span></a><a href="#name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>name</span></a><a href="#schedule"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>schedule</span></a><a href="#size"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>size</span></a><a href="#spares"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>spares</span></a><a href="#stallms"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Property"><use href="../assets/icons.svg#icon-1024"></use></svg><span>stall<wbr/>Ms</span></a></div></details></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.1.0</a>
+<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.1.1</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
