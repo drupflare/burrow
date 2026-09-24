@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">JobStats</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#catchups">catchUps</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commitms">commitMs</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#commits">commits</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#hedges">hedges</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#publishms">publishMs</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#requests">requests</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#retries">retries</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#rowswritten">rowsWritten</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#slicemaxms">sliceMaxMs</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#slicep50ms">sliceP50Ms</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#spanms">spanMs</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L28">src/parallel/scheduler.ts:28</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L28">src/parallel/scheduler.ts:28</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -45,75 +45,75 @@
 <div class="tsd-comment tsd-typography"><p>background prepares started because a slice found a lane stale</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L49">src/parallel/scheduler.ts:49</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L49">src/parallel/scheduler.ts:49</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="commitms"><span>commit<wbr/>Ms</span><a href="#commitms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">commitMs</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>time spent inside <code>commit</code>, summed; where the primary shows up as the bottleneck</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L43">src/parallel/scheduler.ts:43</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L43">src/parallel/scheduler.ts:43</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="commits"><span>commits</span><a href="#commits" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">commits</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>slices whose effects the pool's <code>commit</code> applied</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L41">src/parallel/scheduler.ts:41</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L41">src/parallel/scheduler.ts:41</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="hedges"><span>hedges</span><a href="#hedges" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">hedges</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>late slices duplicated onto a spare</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L32">src/parallel/scheduler.ts:32</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L32">src/parallel/scheduler.ts:32</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="publishms"><span>publish<wbr/>Ms</span><a href="#publishms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">publishMs</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>time spent inside a build's <code>publish</code>; 0 for every other call</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L47">src/parallel/scheduler.ts:47</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L47">src/parallel/scheduler.ts:47</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="requests"><span>requests</span><a href="#requests" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">requests</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>lane requests made, hedges and retries included</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L30">src/parallel/scheduler.ts:30</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L30">src/parallel/scheduler.ts:30</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="retries"><span>retries</span><a href="#retries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">retries</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>failed attempts re-run elsewhere</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L34">src/parallel/scheduler.ts:34</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L34">src/parallel/scheduler.ts:34</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="rowswritten"><span>rows<wbr/>Written</span><a href="#rowswritten" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">rowsWritten</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>rows <code>commit</code> reported writing by answering a number; burrow cannot see them otherwise</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L45">src/parallel/scheduler.ts:45</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L45">src/parallel/scheduler.ts:45</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="slicemaxms"><span>slice<wbr/>Max<wbr/>Ms</span><a href="#slicemaxms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">sliceMaxMs</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L39">src/parallel/scheduler.ts:39</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L39">src/parallel/scheduler.ts:39</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="slicep50ms"><span>slice<wbr/>P50<wbr/>Ms</span><a href="#slicep50ms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">sliceP50Ms</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>median and slowest accepted slice</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L38">src/parallel/scheduler.ts:38</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L38">src/parallel/scheduler.ts:38</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="spanms"><span>span<wbr/>Ms</span><a href="#spanms" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">spanMs</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">number</span></div>
 <div class="tsd-comment tsd-typography"><p>wall time from the first dispatch to the last result</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/scheduler.ts#L36">src/parallel/scheduler.ts:36</a></li></ul></aside></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/scheduler.ts#L36">src/parallel/scheduler.ts:36</a></li></ul></aside></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">

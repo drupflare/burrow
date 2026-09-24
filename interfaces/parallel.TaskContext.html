@@ -16,7 +16,7 @@
 </div></section>
 <div class="tsd-signature"><span class="tsd-signature-keyword">interface</span> <span class="tsd-kind-interface">TaskContext</span> <span class="tsd-signature-symbol">{</span><br/>    <a class="tsd-kind-property" href="#env">env</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#lane">lane</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-property" href="#storage">storage</a><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">DurableObjectStorage</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#atomic-1">atomic</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">key</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="../classes/parallel.LaneAtomic.html" class="tsd-signature-type tsd-kind-class">LaneAtomic</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#channel-1">channel</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">alias</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="../classes/parallel.LaneChannel.html" class="tsd-signature-type tsd-kind-class">LaneChannel</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#effect-1">effect</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">op</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">unknown</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">void</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#map-1">map</a><span class="tsd-signature-symbol">(</span><br/>        <span class="tsd-kind-parameter">work</span><span class="tsd-signature-symbol">:</span> <a href="../types/parallel.Work.html" class="tsd-signature-type tsd-kind-type-alias">Work</a><span class="tsd-signature-symbol">,</span><br/>        <span class="tsd-kind-parameter">inputs</span><span class="tsd-signature-symbol">?:</span> (<span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span>)<span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">,</span><br/>    <span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="parallel.LaneResult.html" class="tsd-signature-type tsd-kind-interface">LaneResult</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#mutex-1">mutex</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">key</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <a href="../classes/parallel.LaneMutex.html" class="tsd-signature-type tsd-kind-class">LaneMutex</a><span class="tsd-signature-symbol">;</span><br/>    <a class="tsd-kind-call-signature" href="#spawn-1">spawn</a><span class="tsd-signature-symbol">(</span><span class="tsd-kind-parameter">work</span><span class="tsd-signature-symbol">:</span> <a href="../types/parallel.Work.html" class="tsd-signature-type tsd-kind-type-alias">Work</a><span class="tsd-signature-symbol">)</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="parallel.LaneResult.html" class="tsd-signature-type tsd-kind-interface">LaneResult</a><span class="tsd-signature-symbol">&gt;</span><span class="tsd-signature-symbol">;</span><br/><span class="tsd-signature-symbol">}</span></div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L20">src/parallel/lane.ts:20</a></li></ul></aside>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L20">src/parallel/lane.ts:20</a></li></ul></aside>
 <section class="tsd-panel-group tsd-index-group">
 <section class="tsd-panel tsd-index-panel">
 <details class="tsd-index-content tsd-accordion" open><summary class="tsd-accordion-summary tsd-index-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
@@ -46,21 +46,21 @@
 <div class="tsd-comment tsd-typography"><p>the environment the lane class was constructed with</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L24">src/parallel/lane.ts:24</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L24">src/parallel/lane.ts:24</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="lane"><code class="tsd-tag">Readonly</code><span>lane</span><a href="#lane" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">lane</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">string</span></div>
 <div class="tsd-comment tsd-typography"><p>the lane id running the slice</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L22">src/parallel/lane.ts:22</a></li></ul></aside></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L22">src/parallel/lane.ts:22</a></li></ul></aside></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="storage"><code class="tsd-tag">Readonly</code><span>storage</span><a href="#storage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <div class="tsd-signature"><span class="tsd-kind-property">storage</span><span class="tsd-signature-symbol">:</span> <span class="tsd-signature-type">DurableObjectStorage</span></div>
 <div class="tsd-comment tsd-typography"><p>this lane's own durable storage</p>
 </div><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L26">src/parallel/lane.ts:26</a></li></ul></aside></section></section></details>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L26">src/parallel/lane.ts:26</a></li></ul></aside></section></section></details>
 <details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Methods"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>
 <h2 class="tsd-anchor-link" id="methods-1">Methods<a href="#methods-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2></summary>
 <section>
@@ -78,7 +78,7 @@
 <li><span><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="../classes/parallel.LaneAtomic.html" class="tsd-signature-type tsd-kind-class">LaneAtomic</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L34">src/parallel/lane.ts:34</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L34">src/parallel/lane.ts:34</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="channel"><span>channel</span><a href="#channel" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -93,7 +93,7 @@
 <li><span><span class="tsd-kind-parameter">alias</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="../classes/parallel.LaneChannel.html" class="tsd-signature-type tsd-kind-class">LaneChannel</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L38">src/parallel/lane.ts:38</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L38">src/parallel/lane.ts:38</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="effect"><span>effect</span><a href="#effect" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -110,7 +110,7 @@ never apply them twice.</p>
 <li><span><span class="tsd-kind-parameter">op</span>: <span class="tsd-signature-type">unknown</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">void</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L32">src/parallel/lane.ts:32</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L32">src/parallel/lane.ts:32</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="map"><span>map</span><a href="#map" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -126,7 +126,7 @@ never apply them twice.</p>
 <li><span><code class="tsd-tag">Optional</code><span class="tsd-kind-parameter">inputs</span>: (<span class="tsd-signature-type">string</span> <span class="tsd-signature-symbol">|</span> <span class="tsd-signature-type">Uint8Array</span><span class="tsd-signature-symbol">&lt;</span><span class="tsd-signature-type">ArrayBufferLike</span><span class="tsd-signature-symbol">&gt;</span>)<span class="tsd-signature-symbol">[]</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="parallel.LaneResult.html" class="tsd-signature-type tsd-kind-interface">LaneResult</a><span class="tsd-signature-symbol">[]</span><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L45">src/parallel/lane.ts:45</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L45">src/parallel/lane.ts:45</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="mutex"><span>mutex</span><a href="#mutex" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -141,7 +141,7 @@ never apply them twice.</p>
 <li><span><span class="tsd-kind-parameter">key</span>: <span class="tsd-signature-type">string</span></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <a href="../classes/parallel.LaneMutex.html" class="tsd-signature-type tsd-kind-class">LaneMutex</a></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L36">src/parallel/lane.ts:36</a></li></ul></aside></div></li></ul></section>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L36">src/parallel/lane.ts:36</a></li></ul></aside></div></li></ul></section>
 <section class="tsd-panel tsd-member">
 <h3 class="tsd-anchor-link" id="spawn"><span>spawn</span><a href="#spawn" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ul class="tsd-signatures">
@@ -157,7 +157,7 @@ would for any other I/O, so a child can always be scheduled even on a one-lane p
 <li><span><span class="tsd-kind-parameter">work</span>: <a href="../types/parallel.Work.html" class="tsd-signature-type tsd-kind-type-alias">Work</a></span></li></ul></div>
 <h4 class="tsd-returns-title">Returns <span class="tsd-signature-type">Promise</span><span class="tsd-signature-symbol">&lt;</span><a href="parallel.LaneResult.html" class="tsd-signature-type tsd-kind-interface">LaneResult</a><span class="tsd-signature-symbol">&gt;</span></h4><aside class="tsd-sources">
 <ul>
-<li>Defined in <a href="https://github.com/drupflare/burrow/blob/3c44843610979354cb851f2ed45df823335b0a33/src/parallel/lane.ts#L43">src/parallel/lane.ts:43</a></li></ul></aside></div></li></ul></section></section></details></div>
+<li>Defined in <a href="https://github.com/drupflare/burrow/blob/b7549bb0036ea32da318c49390a5a18da332e06c/src/parallel/lane.ts#L43">src/parallel/lane.ts:43</a></li></ul></aside></div></li></ul></section></section></details></div>
 <div class="col-sidebar">
 <div class="page-menu">
 <div class="tsd-navigation settings">
