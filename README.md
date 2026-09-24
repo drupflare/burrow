@@ -11,6 +11,7 @@ Execute arbitrary WebAssembly on Cloudflare Workers.
 - [🔗 Dynamic Libraries](#-dynamic-libraries)
 - [📦 Declaring a Runtime](#-declaring-a-runtime)
 - [🧮 Memory Budget](#-memory-budget)
+- [⚡ Parallel Lanes](#-parallel-lanes)
 - [🩺 Doctor](#-doctor)
 - [🔒 Security](#-security)
 - [🧭 Subpath Exports](#-subpath-exports)
@@ -161,6 +162,43 @@ observation after each run.
 A lease is the interlock: nothing leased is ever evicted, and a boot that cannot fit throws
 `BudgetError` rather than letting the isolate run out.
 
+## ⚡ Parallel Lanes
+
+One isolate has one thread. `@drupflare/burrow/parallel` spreads one job across Durable Objects of
+the same Worker, each on its own execution context, and gathers the results in order.
+
+```ts
+import { defineLane, LanePool } from '@drupflare/burrow/parallel';
+import wasm3 from '@drupflare/burrow/vendor/wasm3.wasm';
+
+export const BurrowLane = defineLane({
+  interpreter: wasm3,
+  tasks: { checksum: (input) => input.reduce((a, b) => (a + b) >>> 0, 0) }
+});
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const pool = new LanePool(env.BURROW_LANES, { size: 16 });
+    const sums = await pool.map({ task: 'checksum' }, [new Uint8Array([1, 2]), 'text']);
+    return Response.json(sums.map((r) => r.number()));
+  }
+};
+```
+
+```jsonc
+"durable_objects": { "bindings": [{ "name": "BURROW_LANES", "class_name": "BurrowLane" }] },
+"migrations": [{ "tag": "burrow-lanes", "new_sqlite_classes": ["BurrowLane"] }]
+```
+
+A slice can be guest wasm, a named task from your bundle, or a runtime evaluation. The pool retries
+failures on spare lanes and hedges slow slices, and accepts exactly one result per slice. Measured
+through the packed package on a deployed Worker, a warm 16-lane pool ran an interpreted guest job
+9.3x faster than one lane on the free plan and 7.8x faster on the paid plan.
+
+`spawn` and `scope` give thread-like handles, `atomic` and `mutex` coordinate lanes, and `channel`
+streams messages between them. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#parallel-lanes) covers the
+semantics and the measurements.
+
 ## 🩺 Doctor
 
 ```sh
@@ -235,7 +273,7 @@ gate. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#security) has the threat model in fu
 
 | Export        | Contents                                |
 | ------------- | --------------------------------------- |
-| `.`           | the whole public surface                |
+| `.`           | everything except `./parallel`          |
 | `./interpret` | `createInterpreter`, `WasmInterpreter`  |
 | `./dylink`    | `createLinker`, `readDylink`, `Library` |
 | `./registry`  | `Burrow`, leases                        |
@@ -246,6 +284,7 @@ gate. [ADVANCED_USAGE.md](ADVANCED_USAGE.md#security) has the threat model in fu
 | `./doctor`    | `inspectSource`, `inspectWasm`          |
 | `./publish`   | `publishVersion`                        |
 | `./probe`     | `probe`                                 |
+| `./parallel`  | `LanePool`, `defineLane`, `LaneTask`    |
 | `./errors`    | every error type and its code           |
 
 The interpreter binary is an asset rather than a module, and it is imported by path:

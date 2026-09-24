@@ -41,6 +41,10 @@
 			"types": "./dist/publish.d.ts",
 			"import": "./dist/publish.js"
 		},
+		"./parallel": {
+			"types": "./dist/parallel.d.ts",
+			"import": "./dist/parallel.js"
+		},
 		"./probe": {
 			"types": "./dist/probe.d.ts",
 			"import": "./dist/probe.js"

@@ -8,6 +8,7 @@ import * as dylinkModule from '../src/dylink.js';
 import * as errorsModule from '../src/errors.js';
 import * as indexModule from '../src/index.js';
 import * as interpretModule from '../src/interpret.js';
+import * as parallelModule from '../src/parallel.js';
 import * as probeModule from '../src/probe.js';
 import * as publishModule from '../src/publish.js';
 import * as registryModule from '../src/registry.js';
@@ -44,6 +45,7 @@ const SUBPATHS: Array<[string, string, Record<string, unknown>, string]> = [
 	['./dylink', 'dylink', dylinkModule, 'createLinker'],
 	['./errors', 'errors', errorsModule, 'BurrowError'],
 	['./interpret', 'interpret', interpretModule, 'createInterpreter'],
+	['./parallel', 'parallel', parallelModule, 'LanePool'],
 	['./probe', 'probe', probeModule, 'probe'],
 	['./publish', 'publish', publishModule, 'publishVersion'],
 	['./registry', 'registry', registryModule, 'Burrow'],
@@ -113,6 +115,12 @@ describe('the package exports map', () => {
 		for (const path of library) {
 			expect(sources[path], `${path} imports commander`).not.toContain("from 'commander'");
 		}
+	});
+
+	it('keeps ./parallel out of the root, which must import outside workerd', () => {
+		// the lane class extends DurableObject from cloudflare:workers, which node cannot resolve
+		expect(sources['../src/index.ts']).not.toContain('parallel');
+		expect(indexModule).not.toHaveProperty('LanePool');
 	});
 
 	it('points bin at a file inside dist', () => {

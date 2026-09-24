@@ -8,6 +8,7 @@
 		"src/dylink.ts",
 		"src/errors.ts",
 		"src/interpret.ts",
+		"src/parallel.ts",
 		"src/probe.ts",
 		"src/publish.ts",
 		"src/registry.ts",
