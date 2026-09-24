@@ -9,6 +9,7 @@ Reference material for the parts of burrow that need more than a signature to us
 - [Dynamic Linking](#dynamic-linking)
 - [The Performance Law](#the-performance-law)
 - [Memory Budgeting](#memory-budgeting)
+- [Parallel Lanes](#parallel-lanes)
 - [Security](#security)
 - [Things That Will Bite You](#things-that-will-bite-you)
 
@@ -354,6 +355,225 @@ await using lease = await burrow.acquire('php');
 A boot that cannot fit because everything resident is leased throws `BudgetError` rather than
 evicting something in use. The failure to avoid is an isolate OOM, which takes down the whole
 Durable Object rather than one request.
+
+## Parallel Lanes
+
+A Worker isolate has one execution context: `Worker` is undefined, `navigator.hardwareConcurrency`
+is 1 and `Atomics.wait` throws, all tested on a deployed Worker. Distinct Durable Objects of the
+same
+class run concurrently, so a job split across objects gets parallel CPU and aggregate memory. Lanes
+share no memory; slices exchange bytes.
+
+### Setup
+
+`defineLane` returns the Durable Object class. One class serves every role the pool needs: lanes,
+spares, coordinators, sync objects and channel brokers are instances of it under separate ids, so a
+consumer adds one export, one binding and one migration. The class must be SQLite-backed, because
+sync objects keep their state in SQL.
+
+```ts
+import { defineLane } from '@drupflare/burrow/parallel';
+import wasm3 from '@drupflare/burrow/vendor/wasm3.wasm';
+
+export const BurrowLane = defineLane({
+  interpreter: wasm3,
+  tasks: {
+    // named tasks run at native speed; the body is ordinary code from this bundle
+    checksum: (input) => input.reduce((a, b) => (a + b) >>> 0, 0)
+  },
+  prepare: async (ctx, have, want) => {
+    // seed ctx.storage until this lane holds `want`, then answer the tags it now holds
+    return { ...have, ...want };
+  }
+});
+```
+
+An existing Durable Object class, such as a replica that already holds the data a slice needs, can
+serve slices without becoming a second class by forwarding its `fetch` to
+`handleLaneRequest(this.ctx, this.env, request, config)`.
+
+### Work Kinds
+
+| Work                            | The lane                                                                             | Result                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| `{ guest, fn, args?, input? }`  | loads the guest, writes `input` at its `alloc` export, calls `fn(ptr, len, ...args)` | the i32, or bytes with `result: 'bytes'` |
+| `{ task, input?, channels? }`   | calls the named task with `(input, ctx)`                                             | the return value, encoded by type        |
+| `{ runtime, source?, files? }`  | instantiates the runtime for this slice, evaluates, discards                         | `RunResult` on `result.run`              |
+| `{ runtime, source, affinity }` | keeps a session on the lane chosen by `affinity` between slices                      | `RunResult`; state carries               |
+
+A guest that imports host functions is refused with `burrow.parallel.impure` unless the work says
+`idempotent: true`, because hedging and retries can run a slice twice. A `bytes` result is a pointer
+to a little-endian `u32` length followed by that many bytes.
+
+### Scheduling
+
+- **Pull by default.** Idle lanes take the next slice. On a deployed prototype of this scheduler, a
+  1 s job at 16 lanes spanned 121 ms against 160 ms for static assignment, with the slowest rep at
+  181 against 500.
+- **Over-partitioning.** A single `input` is split into twice as many chunks as there are lanes;
+  pass `split` or pre-chunked `inputs` for records.
+- **Deadline hedge.** Once a quarter of the slices are in, a slice running past three times the
+  median, or `hedgeFloorMs` (250 ms) if that is longer, is duplicated onto a spare and the first
+  good
+  answer wins. Before a quarter are in, the deadline is eight times the floor.
+- **Retries** go to a spare. `impure`, `unknown_task` and `frame_malformed` are never retried. A
+  failure that implicates the lane itself, such as an allocation failure, retires that lane id for
+  every later job from the same isolate.
+- **Sticky slices** (`affinity`) are never hedged or moved; their failure is `sticky_failed`.
+- **A stall timer** (`stallMs`, 30 s) bounds every lane call.
+- **Coordinator.** By default a job is handed to a coordinator object that runs the scheduler and
+  streams results back. On the free plan a Worker was measured refused at 10 ms of CPU once its
+  burst was spent, while an object was not. `coordinator: false` schedules in the caller.
+- Every call records `pool.lastStats`: requests, hedges, retries, span and slice times, plus the
+  number of commits, the time spent inside `commit` and a build's `publish`, and the rows `commit`
+  reported writing. Commit time is where a primary becoming the bottleneck shows first.
+
+### Exactly Once
+
+The pool accepts one result per slice. A task run with `effects: 'capture'` records `ctx.effect(op)`
+calls instead of applying them, and the pool's `commit` receives them once per accepted slice; the
+write-set of a losing hedge or a failed attempt is discarded. On a deployed Worker, with every
+primary held past the deadline so that primary and hedge both finished, 16 hedged slices per job
+produced exactly 16 commits in 3 of 3 jobs.
+
+A slice is marked accepted before `commit` runs, so a `commit` that throws is never retried into a
+second apply. Instead the job stops and rejects with `commit_failed`: `slices` names the slice whose
+commit threw and `committed` lists, in order, every slice applied before it. Nothing after the
+failure is committed, so recovery resumes from exactly that list. `commit` can answer the number of
+rows it wrote, and the pool sums them into `lastStats.rowsWritten`; burrow cannot count rows written
+by the caller's own code any other way.
+
+`build` separates computing from publishing: each accepted result is staged, and `publish` runs
+once, only if every slice staged and passed `validate`. Otherwise it throws `build_incomplete`
+naming the slices and the previous output keeps serving whole. On a deployed prototype with 34
+synthetic pages at measured render costs, staged publication was visible 10-16x sooner than a
+serial fill and no reader saw a mixed set.
+
+Retiring the previous generation costs rows. Cloudflare's Durable Objects pricing counts deletes as
+rows written, and in that prototype the flips and old-generation deletes wrote 3.4k of the
+round's rows. Staging into two slots per path and overwriting the older slot on the next build
+avoids the delete; that alternative has not been measured.
+
+### Stateful Lanes
+
+A slice with `requires: { generation: 42 }` runs only on a lane whose tags match; any other lane
+answers `stale_state` at once rather than catching up on the serving path. `pool.prepare(want)` runs
+the `prepare` hook on every lane and spare, off the serving path. Spares matter: a hedge or retry of
+a stateful slice lands on one.
+
+`prepare` runs in the lane's slot, so no slice sees the state change mid-run, and a change of tags
+disposes the lane's sticky runtime sessions, which were built against the old state. A lane reads
+its tags from storage on every request rather than keeping a copy: an object can move between
+isolates, and a copy left in the old isolate would hand `prepare` a stale `have` and replay a range
+the lane already holds.
+
+Replicate state into lanes rather than reading through to a primary. A lane-to-primary query was
+measured at 7 ms p50 on a deployed prototype, so a request with hundreds of queries costs more than
+it saves.
+
+Warm state belongs in module scope keyed by object id, which `defineLane` does for sticky runtime
+sessions. On a deployed probe, instance memory was gone after every idle of 15 s or more, while
+module-scope state
+survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.
+
+### Sync
+
+`pool.atomic(key)` and `ctx.atomic(key)` reach one shared number with `load`, `store`, `add` and
+`compareExchange`, answering as `Atomics` does. Every op from a slice carries that slice's
+`(job, slice)` identity, so a hedged or retried slice repeating an op gets the first answer instead
+of applying it again. From the caller, ops apply as sent.
+
+`pool.mutex(key).acquire()` answers a lease with an increasing fencing token and an expiry
+(`ttlMs`, 10 s). A holder that never releases loses the lock at expiry and the next waiter is
+granted;
+its later `release`, `read` and `write` fail with `lock_lost`. Waiters are served first come, first
+served, and `timeoutMs` bounds the wait with `lock_timeout`.
+
+**State the lock protects belongs in the lease.** `lease.read` and `lease.write` run inside the lock
+object and check its current token. In a deployed prototype, a separate resource that only compares
+tokens it has already seen was measured accepting a dead holder's write in 5 of 5 trials, before the
+new holder had
+written anything.
+
+| Op                       | Measured on a deployed prototype                         |
+| ------------------------ | -------------------------------------------------------- |
+| atomic op                | 16-18 ms p50                                             |
+| lock acquire and release | 39-42 ms p50                                             |
+| contended lock           | 17-21 critical sections per second at 4, 16 and 32 lanes |
+
+A lock is a serial point, so keep it for correctness boundaries and count with atomics.
+
+### Channels
+
+`pool.channel(name, { capacity })` is a bounded queue held by a broker object. A sender waits while
+it is full, a receiver while it is empty, and several of each may attach; each message reaches one
+receiver. `close()` ends iteration for every receiver once the buffer drains, and a closed name
+stays
+closed. `scope.channel(name)` picks a fresh name and closes it when the scope ends.
+
+```ts
+await using scope = pool.scope();
+const pipe = scope.channel('frames', { capacity: 64 });
+const consumer = scope.spawn({ task: 'consume', channels: { in: pipe } });
+await scope.spawn({ task: 'produce', channels: { out: pipe } });
+```
+
+Sends from a slice are numbered by `(job, slice)`, and the broker drops a number it has seen, so a
+retried or hedged producer delivers each message once. A consumer that fails after receiving has
+consumed those messages; a retry sees only what is left.
+
+Each endpoint is one long request carrying a stream of records. The broker measured 4.3-5.1k
+messages per second from one producer to one consumer on a deployed Worker. In a prototype,
+WebSocket and long-poll channels held idle for 60 s billed both ends for the whole minute. burrow's
+endpoints are open requests in the same way and have not been measured separately, which is why
+channels are scoped.
+
+### Nesting
+
+A task can run children with `ctx.spawn(work)` and `ctx.map(work, inputs)`. While a lane waits on
+children, a channel or a lock, it gives up its slot, so a child can always be scheduled, even on a
+one-lane pool. The control case, a raw pool created inside a task calling back into its own lane,
+stalls. On a deployed prototype, 4 parents with 4 children each ran in 721 ms against 710 ms flat,
+and without the yield 13-16 of 16 children timed out.
+
+### Transport
+
+Slices, results and channel records travel as `stub.fetch` bodies. The threshold matrix below was
+run
+on a deployed Worker, 3 repetitions per cell, each call to a distinct object.
+
+| Concurrent calls x size | RPC `Uint8Array` argument | RPC `ReadableStream` argument | `fetch` body |
+| ----------------------- | ------------------------- | ----------------------------- | ------------ |
+| 4 x 1 MiB               | 12/12                     | 12/12                         | 12/12        |
+| 8 x 512 KiB             | 18/24                     | 24/24                         | 24/24        |
+| 16 x 512 KiB            | 31/48                     | 39/48                         | 48/48        |
+| 32 x 256 KiB            | 69/96                     | 67/96                         | 96/96        |
+| 32 x 1 MiB              | 34/96                     | 24/96                         | 96/96        |
+
+Failed RPC calls rejected with `Network connection lost`; an earlier round saw them never answer
+instead. Streams passed as RPC arguments also failed sporadically at 8 x 64 KiB.
+
+### Measured Speedup
+
+A 64-slice interpreted guest job, exact against a native reference on every run, through the packed
+package on deployed Workers. Warm means a stable pool name after one warmup; the span is the
+coordinator's, median of five. Clocks on the edge advance in 20 ms steps.
+
+| Lanes | Free plan span | Speedup | Paid plan span | Speedup |
+| ----- | -------------- | ------- | -------------- | ------- |
+| 1     | 1,300 ms       | 1x      | 780 ms         | 1x      |
+| 8     | 160 ms         | 8.1x    | 140 ms         | 5.6x    |
+| 16    | 140 ms         | 9.3x    | 100 ms         | 7.8x    |
+
+A pool whose ids are new on every job pays object creation instead: slices took about 140 ms p50
+against 40 ms warm, and single slices reached 3.5 s. Keep pool names stable.
+
+### Health
+
+`pool.health()` probes every lane and reports lanes that share an isolate. Co-resident lanes share
+one thread and one 128 MiB heap, so two heavy runtimes cannot fit together. `pool.repair()` moves
+all
+but one lane of each group to fresh ids for every later job from the same isolate.
 
 ## Security
 

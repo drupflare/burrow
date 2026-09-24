@@ -13,6 +13,7 @@ deploy, it says so.
 - [The Interpreter Build](#the-interpreter-build)
 - [What Was Measured and Refuted](#what-was-measured-and-refuted)
 - [Native Dynamic Linking](#native-dynamic-linking)
+- [Parallel Lanes](#parallel-lanes)
 - [Instrument Rules](#instrument-rules)
 - [Limits](#limits)
 
@@ -249,6 +250,97 @@ wasm libc bundled, the adapter requirement across the corpus is zero.
 This applies to **bundled** libraries. Arbitrary request-time bytes remain interpreter-only, because
 `import()` cannot take bytes from a request and `dylink.0` cannot be read back from a compiled Module.
 
+## Parallel Lanes
+
+One isolate has one thread (see the parallelism gate above), so parallel work on one Worker has to
+leave the isolate. Distinct Durable Objects of the same class run on separate execution contexts,
+and `@drupflare/burrow/parallel` builds a scheduler over them. Everything here stays inside one
+traditional Worker: no service bindings, no Dynamic Workers, no Containers.
+
+### What One Job Gets
+
+Measured on a deployed probe on the free plan. The lane kernel was burrow's interpreter running a
+141-byte xorshift guest whose sum is partition-invariant, so every split has one correct answer;
+0 of 162 answers were wrong. Overlap was bounded without a cross-machine clock: every lane runs
+inside the coordinator's span by causality, so the sum of lane CPU time over the span is a lower
+bound on concurrency.
+
+| Measurement                       | Result                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| strong scaling, ~1 s job          | 1,021 / 554 / 440 / 254 / 158 ms at 1 / 2 / 4 / 8 / 16 lanes, 6.46x       |
+| weak scaling, 32 lanes            | 19.07x throughput, at least 15.62 concurrent CPU streams                  |
+| aggregate memory, one job         | 8 x 96 MiB held; one isolate refuses 192 MiB                              |
+| cost model                        | `span = ~23 ms + ~1.6 ms per lane + slowest lane`                         |
+| warm pool, 17 min, idles to 5 min | 32 of 32 isolates in every job, no replacements, no failures              |
+| co-residency                      | sticky when it happens; a co-resident pair costs the job both slices, 35% |
+
+The efficiency loss is stragglers, not fan-out: the slowest lane's wall time jumps from 135 ms to
+about 205 ms between 2 and 4 lanes while the mean stays at 140-160. That is why the scheduler
+over-partitions, pulls work and hedges rather than making dispatch cheaper.
+
+Module scope is per isolate, not per object. 7 of 171 isolates hosted two live objects interleaved,
+and both read the same module state. Instance memory was gone after every idle of 15 s or more while
+module state survived 8 of 8 idles of 120 s, so warm runtime state is kept at module scope keyed by
+object id.
+
+### Through the Package
+
+Release gate 3 ran the packed 1.1.0 tarball on deployed Workers on both plans, every answer checked
+against a native reference. Spans are the coordinator's `Date.now()` across I/O, which advances in
+20 ms steps; warm means a stable pool name after one warmup, median of five.
+
+| Lanes | Free span | Speedup | Paid span | Speedup |
+| ----- | --------- | ------- | --------- | ------- |
+| 1     | 1,300 ms  | 1x      | 780 ms    | 1x      |
+| 8     | 160 ms    | 8.1x    | 140 ms    | 5.6x    |
+| 16    | 140 ms    | 9.3x    | 100 ms    | 7.8x    |
+
+A 32-lane job made 66 lane requests from one coordinator invocation on the free plan with no
+refusal. A stateful job with every primary held past the hedge deadline produced 16 hedges and
+exactly 16 commits in 3 of 3 runs. One producer and one consumer moved 5,000 channel messages through
+a broker at 4.3-5.1k per second. A QuickJS runtime isolated fresh slices and carried state 1, 2, 3
+across sticky ones on a single lane.
+
+The gate found four defects that the unit lane could not, each now covered by a gate test: spares
+were never prepared, so every hedge of a stateful slice failed; object failures reached callers as
+untyped errors; a channel close flipped state in memory before its write succeeded; and a retried
+producer sent its messages twice.
+
+### Transport
+
+Release gate 2, deployed, 3 repetitions per cell, each call to a distinct object. Delivered calls out
+of attempted:
+
+| Concurrent calls x size | RPC `Uint8Array` argument | RPC `ReadableStream` argument | `fetch` body |
+| ----------------------- | ------------------------- | ----------------------------- | ------------ |
+| 8 x 512 KiB             | 18/24                     | 24/24                         | 24/24        |
+| 16 x 512 KiB            | 31/48                     | 39/48                         | 48/48        |
+| 32 x 256 KiB            | 69/96                     | 67/96                         | 96/96        |
+| 32 x 1 MiB              | 34/96                     | 24/96                         | 96/96        |
+
+Failed RPC calls rejected with `Network connection lost`; an earlier round saw calls carrying byte
+arguments never answered at 4-16 MiB aggregate. Slices, results and channel records therefore all
+travel as `stub.fetch` bodies.
+
+### Measured and Closed
+
+- **Self-fetch fan-out.** Children ran in the coordinator's own isolate, and 277 of 300 ended
+  `exceededCpu` after the first round.
+- **A Worker as coordinator on the free plan.** After two bursts of about 1.6 s, a fetch handler was
+  refused at exactly 10 ms of CPU every time, while an object ran 10 of 10 at about 1.5 s.
+- **Reading state through to a primary.** 7 ms p50 per query, 1.4-1.5 s for 200 queries; lanes
+  replicate instead.
+- **Fencing with an external resource.** A resource that compares only tokens it has seen accepted a
+  dead holder's write in 5 of 5 trials before the new holder wrote. Protected state lives in the lock
+  object and is checked against its current token.
+- **Long-poll and WebSocket channels.** 21-31 ms and 4 ms round trips, 155 and 3.4-4.7k messages per
+  second, against 2 ms and 8.7-9.1k for a point-to-point stream. Idle channels of both kinds billed
+  both ends for the whole 60 s held.
+- **Nesting without yielding the slot.** 13-16 of 16 children timed out and 0 of 5 answers were
+  exact; with the yield, 721 ms against 710 ms flat.
+- **A lock as a scaling primitive.** 17-21 critical sections per second at 4, 16 and 32 lanes, about
+  50 ms per hand-off.
+
 ## Instrument Rules
 
 Five instrument bugs produced confident wrong numbers here, three of which changed a verdict. The
@@ -294,6 +386,6 @@ A library linked into a host shares that host's whole memory and table, which is
 linking ABI is rather than a weakness in this implementation. `allowHostAccess: true` is required, and
 without it the linker throws `burrow.dylink.host_access_denied`.
 
-Performance figures in this report were measured on an M2 Pro unless they say otherwise. The four
-deployed measurements are the codegen gate, the parallelism gate, the 1.14x pointer chase, and the
-native dynamic linking result.
+Performance figures in this report were measured on an M2 Pro unless they say otherwise. The deployed
+measurements are the codegen gate, the parallelism gate, the 1.14x pointer chase, the native dynamic
+linking result, and everything under Parallel Lanes.
