@@ -3,6 +3,7 @@ import {
 	BudgetError,
 	BurrowError,
 	LeaseError,
+	ParallelError,
 	RuntimeError,
 	UnknownRuntimeError
 } from '../src/errors.js';
@@ -13,7 +14,8 @@ describe('the error vocabulary', () => {
 			new RuntimeError('x', 'burrow.runtime.load_failed'),
 			new UnknownRuntimeError('ruby', ['php']),
 			new BudgetError('php', 10, 5),
-			new LeaseError('php')
+			new LeaseError('php'),
+			new ParallelError('x', 'burrow.parallel.job_failed')
 		];
 		for (const e of all) {
 			expect(e).toBeInstanceOf(BurrowError);
@@ -49,5 +51,20 @@ describe('the error vocabulary', () => {
 		expect(e.required).toBe(100);
 		expect(e.free).toBe(20);
 		expect(e.runtime).toBe('php');
+	});
+
+	it('ParallelError names the failed slices and why, and defaults to none', () => {
+		const e = new ParallelError('x', 'burrow.parallel.job_failed', {
+			slices: [2],
+			causes: ['boom']
+		});
+		expect(e.slices).toEqual([2]);
+		expect(e.causes).toEqual(['boom']);
+		expect(new ParallelError('x', 'burrow.parallel.no_lanes').slices).toEqual([]);
+		expect(new ParallelError('x', 'burrow.parallel.no_lanes').committed).toEqual([]);
+		const failed = new ParallelError('x', 'burrow.parallel.commit_failed', {
+			committed: [0, 1]
+		});
+		expect(failed.committed).toEqual([0, 1]);
 	});
 });

@@ -146,6 +146,60 @@ export class PublishError extends BurrowError {
 	}
 }
 
+/**
+ * A parallel job could not run, or part of it failed.
+ *
+ * `slices` names the slices that failed, so a caller can tell a whole-job refusal from one bad
+ * slice; `causes` carries each failed slice's own error message.
+ *
+ * @since 1.1.0
+ */
+export class ParallelError extends BurrowError {
+	readonly code:
+		| 'burrow.parallel.slice_failed'
+		| 'burrow.parallel.job_failed'
+		| 'burrow.parallel.build_incomplete'
+		| 'burrow.parallel.stale_state'
+		| 'burrow.parallel.impure'
+		| 'burrow.parallel.unknown_task'
+		| 'burrow.parallel.sticky_failed'
+		| 'burrow.parallel.frame_malformed'
+		| 'burrow.parallel.cancelled'
+		| 'burrow.parallel.stalled'
+		| 'burrow.parallel.no_lanes'
+		| 'burrow.parallel.lock_lost'
+		| 'burrow.parallel.lock_timeout'
+		| 'burrow.parallel.channel_closed'
+		| 'burrow.parallel.object_failed'
+		| 'burrow.parallel.commit_failed';
+	/** the slice ids that failed, empty when the job failed as a whole */
+	readonly slices: readonly number[];
+	/** one message per failed slice, in the same order as {@link ParallelError.slices} */
+	readonly causes: readonly string[];
+	/**
+	 * For `burrow.parallel.commit_failed`, the slices whose effects were committed before the
+	 * failing one, so a caller can recover from exactly where the job stopped; empty otherwise.
+	 */
+	readonly committed: readonly number[];
+
+	constructor(
+		message: string,
+		code: ParallelError['code'],
+		options?: {
+			cause?: unknown;
+			slices?: readonly number[];
+			causes?: readonly string[];
+			committed?: readonly number[];
+		}
+	) {
+		super(message, options);
+		this.code = code;
+		this.slices = options?.slices ? [...options.slices] : [];
+		this.causes = options?.causes ? [...options.causes] : [];
+		this.committed = options?.committed ? [...options.committed] : [];
+	}
+}
+
 /** A lease was used after it was released. */
 export class LeaseError extends BurrowError {
 	readonly code = 'burrow.lease.released' as const;
