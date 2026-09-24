@@ -1,6 +1,6 @@
 import { ParallelError } from '../errors.js';
 import { decodeFrame, encodeFrame, type Frame } from './frame.js';
-import type { FailureDesc, SliceDesc } from './lane.js';
+import type { FailureDesc, SliceDesc, StateTags } from './lane.js';
 import type { ResultDesc } from './result.js';
 
 /** @internal one job as it travels to a coordinator: every slice, and where its payload sits */
@@ -16,6 +16,11 @@ export interface JobDesc {
 	floorMs: number;
 	/** the lane that takes the first slice, so single-slice jobs spread across the pool */
 	first?: number;
+	/** what the pool already knows of each lane's tags and isolate, for placement */
+	tags?: Record<string, StateTags>;
+	iso?: Record<string, string>;
+	/** prepare a lane in the background when a slice finds it stale */
+	catchUp?: boolean;
 	slices: Array<{ desc: Omit<SliceDesc, 'jobId' | 'attempt'>; off: number; len: number }>;
 }
 
@@ -40,6 +45,8 @@ export interface JobStats {
 	rowsWritten: number;
 	/** time spent inside a build's `publish`; 0 for every other call */
 	publishMs: number;
+	/** background prepares started because a slice found a lane stale */
+	catchUps: number;
 }
 
 /** @internal what the scheduler reports as a job progresses */
@@ -47,6 +54,8 @@ export interface JobSink {
 	accept(sliceId: number, lane: string, attempts: number, frame: Frame<ResultDesc>): unknown;
 	fail(sliceId: number, reason: FailureDesc): unknown;
 	retire(lane: string): unknown;
+	/** a lane's tags became known mid-job, from a stale refusal or a background prepare */
+	learn?(lane: string, tags: StateTags): unknown;
 }
 
 /** @internal how the scheduler reaches a lane */
@@ -78,6 +87,12 @@ const PERMANENT = new Set<ParallelError['code']>([
 	'burrow.parallel.unknown_task',
 	'burrow.parallel.frame_malformed'
 ]);
+
+/** @internal whether a lane holding `have` may run a slice that requires `want` */
+export function satisfies(have: StateTags, want: StateTags | undefined): boolean {
+	if (!want) return true;
+	return Object.entries(want).every(([k, v]) => have[k] === v);
+}
 
 /** @internal a stable lane index for a sticky key */
 export function stickyIndex(key: string, lanes: number): number {
@@ -148,17 +163,54 @@ export async function runJob(
 	let requests = 0,
 		hedges = 0,
 		retries = 0,
+		catchUps = 0,
 		spareIx = 0,
 		done = 0;
 	let fatal: unknown = null;
 
-	const spare = (): string => {
+	// what is known of each lane, refined as answers arrive; unknown tags count as eligible
+	const tags: Record<string, StateTags> = { ...job.tags };
+	const iso: Record<string, string> = { ...job.iso };
+	const eligible = (lane: string, i: number) => {
+		const have = tags[lane];
+		return !have || satisfies(have, job.slices[i]!.desc.requires);
+	};
+	const score = (lane: string, i: number) => {
+		const want = job.slices[i]!.desc.prefers;
+		const have = tags[lane];
+		return want && have ? Object.entries(want).filter(([k, v]) => have[k] === v).length : 0;
+	};
+
+	const spare = (i: number): string => {
 		const pool = job.spares.length ? job.spares : job.lanes;
+		let fallback: string | undefined;
 		for (let k = 0; k < pool.length; k++) {
 			const s = pool[spareIx++ % pool.length]!;
-			if (!retired.has(s)) return s;
+			if (retired.has(s)) continue;
+			if (eligible(s, i)) return s;
+			fallback ??= s;
 		}
-		return pool[0]!;
+		return fallback ?? pool[0]!;
+	};
+
+	// a stale lane is prepared off the serving path, once per lane and requirement in a job
+	const caughtUp = new Set<string>();
+	let pump = () => {};
+	const catchUp = (lane: string, want: StateTags) => {
+		const key = `${lane}|${JSON.stringify(want)}`;
+		if (job.catchUp === false || caughtUp.has(key)) return;
+		caughtUp.add(key);
+		catchUps++;
+		transport
+			.send(lane, 'prepare', JSON.stringify({ want }))
+			.then((res) => res.json() as Promise<{ tags?: StateTags }>)
+			.then(async (answer) => {
+				if (!answer.tags) return;
+				tags[lane] = answer.tags;
+				await report(() => sink.learn?.(lane, answer.tags!));
+				pump();
+			})
+			.catch(() => {});
 	};
 	const settle = (i: number) => {
 		done++;
@@ -202,7 +254,9 @@ export async function runJob(
 		s.pending--;
 		if (s.accepted || s.failed) return;
 
+		if (frame) iso[lane] = frame.desc.iso || iso[lane] || '';
 		if (frame?.desc.ok) {
+			tags[lane] = (frame.desc as ResultDesc).tags as StateTags;
 			s.accepted = true;
 			durations.push(Date.now() - started);
 			await report(() => sink.accept(i, lane, s.tries, frame as Frame<ResultDesc>));
@@ -210,6 +264,11 @@ export async function runJob(
 			return;
 		}
 		const failure = frame?.desc as FailureDesc | undefined;
+		if (failure?.tags) {
+			tags[lane] = failure.tags;
+			await report(() => sink.learn?.(lane, failure.tags!));
+			if (slice.desc.requires) catchUp(lane, slice.desc.requires);
+		}
 		if (failure?.environment && !retired.has(lane)) {
 			retired.add(lane);
 			await report(() => sink.retire(lane));
@@ -218,7 +277,7 @@ export async function runJob(
 		const permanent = failure !== undefined && PERMANENT.has(failure.code);
 		if (!permanent && !sticky && s.tries < job.maxAttempts && !signal?.aborted) {
 			retries++;
-			return attempt(i, spare());
+			return attempt(i, spare(i));
 		}
 		if (s.pending > 0) return;
 		s.failed = true;
@@ -255,36 +314,111 @@ export async function runJob(
 				if (Date.now() - s.start > limit) {
 					s.hedged = true;
 					hedges++;
-					void attempt(i, spare());
+					void attempt(i, spare(i));
 				}
 			}
 		}
 	})();
 
 	const run = (i: number, lane: string) => {
-		const key = job.slices[i]!.desc.affinity;
-		void attempt(i, key !== undefined ? job.lanes[stickyIndex(key, K)]! : lane);
+		void attempt(i, lane);
 		return settled[i]!.p;
 	};
 	const cancelled = () => signal?.aborted ?? false;
-	await Promise.race([
-		(async () => {
-			const order = job.lanes.map((_, k) => job.lanes[(k + (job.first ?? 0)) % K]!);
-			if (job.schedule === 'static') {
-				await Promise.all(
-					order.map(async (lane, k) => {
-						for (let i = k; i < n && !cancelled(); i += K) await run(i, lane);
-					})
-				);
-			} else {
-				let next = 0;
-				await Promise.all(
-					order.map(async (lane) => {
-						for (let i = next++; i < n && !cancelled(); i = next++) await run(i, lane);
-					})
-				);
+	const order = job.lanes.map((_, k) => job.lanes[(k + (job.first ?? 0)) % K]!);
+	const failFast = async (i: number) => {
+		const want = job.slices[i]!.desc.requires!;
+		state[i]!.failed = true;
+		for (const lane of job.lanes) catchUp(lane, want);
+		await report(() =>
+			sink.fail(i, {
+				ok: false,
+				code: 'burrow.parallel.stale_state',
+				message: `no lane holds ${JSON.stringify(want)}; preparing them in the background`,
+				iso: ''
+			})
+		);
+		settle(i);
+	};
+
+	// sticky slices keep their key's lane and run in input order per key
+	const chains = new Map<string, Promise<void>>();
+	const pending: number[] = [];
+	for (let i = 0; i < n; i++) {
+		const key = job.slices[i]!.desc.affinity;
+		if (key === undefined) {
+			pending.push(i);
+			continue;
+		}
+		const lane = job.lanes[stickyIndex(key, K)]!;
+		chains.set(
+			key,
+			(chains.get(key) ?? Promise.resolve()).then(() =>
+				cancelled() ? undefined : run(i, lane)
+			)
+		);
+	}
+
+	if (job.schedule === 'static') {
+		const byLane = new Map<string, number[]>();
+		pending.forEach((i, k) =>
+			byLane.set(order[k % K]!, [...(byLane.get(order[k % K]!) ?? []), i])
+		);
+		void Promise.all(
+			[...byLane].map(async ([lane, list]) => {
+				for (const i of list) if (!cancelled()) await run(i, lane);
+			})
+		);
+	} else {
+		// locality first: each pending slice goes to the idle lane that satisfies its requires with the
+		// most prefers hits, avoiding an isolate that is already busy, then in rotation order
+		const idle = new Set(order);
+		const busyIso = new Map<string, number>();
+		const pick = (i: number): string | undefined => {
+			let best: string | undefined;
+			let bestKey = [-1, 0, 0];
+			order.forEach((lane, rank) => {
+				if (!idle.has(lane) || !eligible(lane, i)) return;
+				const key = [score(lane, i), -(busyIso.get(iso[lane] ?? lane) ?? 0), -rank];
+				if (
+					key[0]! > bestKey[0]! ||
+					(key[0] === bestKey[0] &&
+						(key[1]! > bestKey[1]! || (key[1] === bestKey[1] && key[2]! > bestKey[2]!)))
+				) {
+					best = lane;
+					bestKey = key;
+				}
+			});
+			return best;
+		};
+		pump = () => {
+			for (let j = 0; j < pending.length && !cancelled();) {
+				const i = pending[j]!;
+				if (!job.lanes.some((lane) => eligible(lane, i))) {
+					pending.splice(j, 1);
+					void failFast(i);
+					continue;
+				}
+				const lane = pick(i);
+				if (!lane) {
+					j++;
+					continue;
+				}
+				pending.splice(j, 1);
+				idle.delete(lane);
+				const at = iso[lane] ?? lane;
+				busyIso.set(at, (busyIso.get(at) ?? 0) + 1);
+				void run(i, lane).then(() => {
+					idle.add(lane);
+					busyIso.set(at, (busyIso.get(at) ?? 1) - 1);
+					pump();
+				});
 			}
-		})(),
+		};
+		pump();
+	}
+	await Promise.race([
+		Promise.all(settled.map((s) => s.p)),
 		new Promise<void>((resolve) =>
 			signal?.addEventListener('abort', () => resolve(), { once: true })
 		)
@@ -320,6 +454,7 @@ export async function runJob(
 		commits: 0,
 		commitMs: 0,
 		rowsWritten: 0,
-		publishMs: 0
+		publishMs: 0,
+		catchUps
 	};
 }

@@ -10,7 +10,7 @@ import { handleChannel, LaneChannel } from './channel.js';
 import { decodeFrame, encodeFrame, encodeRecord } from './frame.js';
 import { LanePool, type Work } from './pool.js';
 import type { LaneResult, ResultDesc, ResultKind } from './result.js';
-import { laneTransport, runJob, type JobDesc } from './scheduler.js';
+import { laneTransport, runJob, satisfies, type JobDesc } from './scheduler.js';
 import { handleSync, LaneAtomic, LaneMutex, type SyncRequest } from './sync.js';
 
 /** Scheduler-visible facts about a lane, such as the generation it holds. */
@@ -102,6 +102,7 @@ export interface SliceDesc {
 	pool?: { name: string; size: number; spares: number };
 	channels?: Record<string, { id: string; capacity: number }>;
 	requires?: StateTags;
+	prefers?: StateTags;
 	effects?: 'capture';
 }
 
@@ -113,6 +114,8 @@ export interface FailureDesc {
 	/** the failure implicates the lane's environment, so the pool should retire the lane id */
 	environment?: boolean;
 	iso: string;
+	/** the tags the lane held, on a stale_state refusal, so the scheduler routes around it */
+	tags?: StateTags;
 }
 
 // per-isolate state. A Durable Object's instance is evicted within seconds of going idle while its
@@ -192,11 +195,6 @@ function disposeSessions(objectId: string): void {
 		entry.burrow.dispose();
 		isolateBudget.forget(entry.as);
 	}
-}
-
-function satisfies(have: StateTags, want: StateTags | undefined): boolean {
-	if (!want) return true;
-	return Object.entries(want).every(([k, v]) => have[k] === v);
 }
 
 function interpreterFor(config: LaneConfig, objectId: string): Promise<WasmInterpreter> {
@@ -457,7 +455,9 @@ export async function handleLaneRequest(
 				fail: (sliceId, reason) =>
 					write(encodeRecord(encodeFrame({ event: 'fail', sliceId, reason }))),
 				retire: (laneId) =>
-					write(encodeRecord(encodeFrame({ event: 'retire', lane: laneId })))
+					write(encodeRecord(encodeFrame({ event: 'retire', lane: laneId }))),
+				learn: (laneId, tags) =>
+					write(encodeRecord(encodeFrame({ event: 'tags', lane: laneId, tags })))
 			},
 			stop.signal
 		)
@@ -492,14 +492,15 @@ export async function handleLaneRequest(
 
 	const { desc, payload } = decodeFrame<SliceDesc>(new Uint8Array(await request.arrayBuffer()));
 	const effects: unknown[] = [];
+	const have = await tagsOf(state);
+	if (!satisfies(have, desc.requires)) {
+		const stale = new ParallelError(
+			`lane ${lane} holds ${JSON.stringify(have)} and the slice requires ${JSON.stringify(desc.requires)}`,
+			'burrow.parallel.stale_state'
+		);
+		return new Response(encodeFrame({ ...failure(stale, iso), tags: have }));
+	}
 	try {
-		const have = await tagsOf(state);
-		if (!satisfies(have, desc.requires)) {
-			throw new ParallelError(
-				`lane ${lane} holds ${JSON.stringify(have)} and the slice requires ${JSON.stringify(desc.requires)}`,
-				'burrow.parallel.stale_state'
-			);
-		}
 		const outcome = await withSlot(objectId, (yielded) => {
 			if (desc.kind === 'guest') return runGuest(config, objectId, desc, payload);
 			if (desc.kind === 'runtime') return runRuntime(config, objectId, desc, payload);

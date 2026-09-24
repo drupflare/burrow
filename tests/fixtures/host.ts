@@ -142,8 +142,12 @@ export const TestLane = defineLane({
 		if (want.generation === 13) throw new Error('generation 13 is unreachable');
 		return { ...have, ...want };
 	},
-	// lanes named cohab/l<n> report one isolate, so health() sees co-residency under miniflare
-	isolateToken: (objectId, lane) => (/^cohab\/l\d+$/.test(lane) ? 'cohab' : objectId)
+	// cohab*/l<n> lanes share one isolate until repaired; stuck/* lanes share one whatever their id
+	isolateToken: (objectId, lane) => {
+		const pool = lane.split('/')[0]!;
+		if (pool === 'stuck') return 'stuck';
+		return /^cohab[^/]*\/l\d+$/.test(lane) ? pool : objectId;
+	}
 });
 
 /** a lane with nothing configured, for the refusals */

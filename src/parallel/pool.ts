@@ -10,6 +10,8 @@ import { LaneAtomic, LaneMutex } from './sync.js';
 interface WorkCommon {
 	/** tags a lane must hold to run the slice, such as `{ generation: 42 }` */
 	requires?: StateTags;
+	/** tags that make a lane a better fit, such as `{ 'warm:php': true }`; placement only, never refused */
+	prefers?: StateTags;
 	/** collect `ctx.effect()` calls instead of applying them; the pool's `commit` applies them once */
 	effects?: 'capture';
 }
@@ -85,6 +87,13 @@ export interface LanePoolOptions {
 	stallMs?: number;
 	/** the shortest deadline a hedge waits for; defaults to 250 ms */
 	hedgeFloorMs?: number;
+	/** prepare a lane in the background when a slice finds it lacking `requires`; defaults to true */
+	catchUp?: boolean;
+	/**
+	 * After each job, move all but one of any lanes seen answering from one isolate to fresh ids,
+	 * once per lane slot; defaults to true. Co-resident lanes share one thread and one heap.
+	 */
+	autoRepair?: boolean;
 	/**
 	 * Applies a slice's captured effects, called exactly once per accepted slice. Answer the number
 	 * of rows written to have them counted in `stats.rowsWritten`. If it throws, the job stops and
@@ -119,15 +128,25 @@ export interface BuildSteps {
  * @since 1.1.0
  */
 export interface PoolHealth {
-	lanes: Array<{ lane: string; isolate: string; tags: StateTags }>;
+	/** every lane and spare, with the isolate it answered from and the tags it holds */
+	lanes: Array<{ lane: string; isolate: string; tags: StateTags; spare: boolean }>;
 	/** distinct isolates across the lanes; fewer than `lanes.length` means some share one */
 	isolates: number;
 	/** lane ids that share an isolate; each group serialises, and two heavy runtimes cannot fit one */
 	coResident: string[][];
 }
 
-// per-isolate memo of repaired lane ids, so every job from this isolate uses the repaired pool
-const memo = new Map<string, { lanes: string[]; next: number }>();
+// per-isolate memo of each pool's lane ids, repairs, and what is known of each lane, so every job
+// from this isolate uses the repaired pool and places slices on what earlier jobs learned
+interface Memo {
+	lanes: string[];
+	spares: string[];
+	next: number;
+	tags: Record<string, StateTags>;
+	iso: Record<string, string>;
+	repaired: Set<string>;
+}
+const memo = new Map<string, Memo>();
 
 function equalSplit(data: Uint8Array, n: number): Uint8Array[] {
 	const parts: Uint8Array[] = [];
@@ -189,32 +208,84 @@ export class LanePool {
 			maxAttempts: options.maxAttempts ?? 3,
 			stallMs: options.stallMs ?? 30_000,
 			hedgeFloorMs: options.hedgeFloorMs ?? 250,
+			catchUp: options.catchUp ?? true,
+			autoRepair: options.autoRepair ?? true,
 			commit: options.commit
 		};
 	}
 
-	/** the lane ids jobs run on, after any repairs this isolate has made */
-	lanes(): string[] {
+	private memo(): Memo {
 		let entry = memo.get(this.name);
-		if (!entry || entry.lanes.length !== this.size) {
+		if (
+			!entry ||
+			entry.lanes.length !== this.size ||
+			entry.spares.length !== this.options.spares
+		) {
 			entry = {
 				lanes: Array.from({ length: this.size }, (_, i) => `${this.name}/l${i}`),
-				next: 0
+				spares: Array.from({ length: this.options.spares }, (_, i) => `${this.name}/s${i}`),
+				next: 0,
+				tags: {},
+				iso: {},
+				repaired: new Set()
 			};
 			memo.set(this.name, entry);
 		}
-		return [...entry.lanes];
+		return entry;
+	}
+
+	/** the lane ids jobs run on, after any repairs this isolate has made */
+	lanes(): string[] {
+		return [...this.memo().lanes];
 	}
 
 	private spares(): string[] {
-		return Array.from({ length: this.options.spares }, (_, i) => `${this.name}/s${i}`);
+		return [...this.memo().spares];
 	}
 
-	/** swaps a lane id for a fresh one; the old object is simply never addressed again */
+	private learn(lane: string, tags?: StateTags, iso?: string): void {
+		const entry = this.memo();
+		if (tags) entry.tags[lane] = tags;
+		if (iso) entry.iso[lane] = iso;
+	}
+
+	/** swaps a lane or spare id for a fresh one; the old object is simply never addressed again */
 	private retire(lane: string): void {
-		const entry = memo.get(this.name);
-		const at = entry?.lanes.indexOf(lane) ?? -1;
-		if (entry && at >= 0) entry.lanes[at] = `${this.name}/l${at}~${++entry.next}`;
+		const entry = this.memo();
+		for (const [list, kind] of [
+			[entry.lanes, 'l'],
+			[entry.spares, 's']
+		] as const) {
+			const at = list.indexOf(lane);
+			if (at < 0) continue;
+			list[at] = `${this.name}/${kind}${at}~${++entry.next}`;
+			delete entry.tags[lane];
+			delete entry.iso[lane];
+		}
+	}
+
+	private coResident(): string[][] {
+		const entry = this.memo();
+		const groups = new Map<string, string[]>();
+		for (const lane of [...entry.lanes, ...entry.spares]) {
+			const at = entry.iso[lane];
+			if (at) groups.set(at, [...(groups.get(at) ?? []), lane]);
+		}
+		return [...groups.values()].filter((g) => g.length > 1);
+	}
+
+	// repairs from what jobs already saw rather than a probe, which would cost a subrequest per lane
+	// from the caller, and a free Worker has 50; each slot is repaired at most once per isolate
+	private autoRepair(): void {
+		const entry = this.memo();
+		for (const group of this.coResident()) {
+			for (const lane of group.slice(1)) {
+				const slot = lane.replace(/~\d+$/, '').slice(this.name.length + 1);
+				if (entry.repaired.has(slot)) continue;
+				entry.repaired.add(slot);
+				this.retire(lane);
+			}
+		}
 	}
 
 	private slices(
@@ -259,6 +330,7 @@ export class LanePool {
 							affinity: work.affinity
 						};
 		base.requires = work.requires;
+		base.prefers = work.prefers;
 		base.effects = work.effects;
 		base.pool = { name: this.name, size: this.size, spares: this.options.spares };
 
@@ -289,6 +361,9 @@ export class LanePool {
 				stallMs: this.options.stallMs,
 				floorMs: this.options.hedgeFloorMs,
 				first: this.cursor++ % this.size,
+				tags: { ...this.memo().tags },
+				iso: { ...this.memo().iso },
+				catchUp: this.options.catchUp,
 				slices
 			},
 			payload
@@ -310,7 +385,8 @@ export class LanePool {
 			desc: ResultDesc,
 			bytes: Uint8Array
 		) => Promise<void>,
-		fail: (sliceId: number, reason: FailureDesc) => void
+		fail: (sliceId: number, reason: FailureDesc) => void,
+		learn: (lane: string, tags: StateTags) => void
 	): Promise<JobStats> {
 		const coordinator = `${this.name}/c${stickyIndex(job.jobId, this.options.coordinators)}`;
 		const res = await laneTransport(this.ns).send(
@@ -334,6 +410,7 @@ export class LanePool {
 					await accept(e.sliceId, e.lane, e.attempts, e.result, record.payload);
 				else if (e.event === 'fail') fail(e.sliceId, e.reason);
 				else if (e.event === 'retire') this.retire(e.lane);
+				else if (e.event === 'tags') learn(e.lane, e.tags);
 				else if (e.event === 'done') return e.stats as JobStats;
 				else if (e.event === 'error') {
 					throw new ParallelError(
@@ -360,7 +437,8 @@ export class LanePool {
 			commits: 0,
 			commitMs: 0,
 			rowsWritten: 0,
-			publishMs: 0
+			publishMs: 0,
+			catchUps: 0
 		};
 		return { ...zero, requests: 0, spanMs: Date.now() - t0 };
 	}
@@ -395,6 +473,7 @@ export class LanePool {
 			bytes: Uint8Array
 		) => {
 			settled.add(sliceId);
+			this.learn(lane, desc.tags as StateTags, desc.iso);
 			if (commitFailure) return;
 			const result = makeLaneResult(desc, bytes, { sliceId, lane, attempts });
 			if (result.effects.length && this.options.commit) {
@@ -425,6 +504,7 @@ export class LanePool {
 			settled.add(sliceId);
 			onFail(sliceId, reason);
 		};
+		const learn = (lane: string, tags: StateTags) => this.learn(lane, tags);
 
 		let stats: JobStats;
 		if (local || !this.options.coordinator) {
@@ -436,13 +516,15 @@ export class LanePool {
 					accept: (sliceId, lane, attempts, frame) =>
 						accept(sliceId, lane, attempts, frame.desc, frame.payload),
 					fail,
-					retire: (lane) => this.retire(lane)
+					retire: (lane) => this.retire(lane),
+					learn
 				},
 				signal
 			);
 		} else {
-			stats = await this.coordinate(job, payload, signal, accept, fail);
+			stats = await this.coordinate(job, payload, signal, accept, fail, learn);
 		}
+		if (this.options.autoRepair) this.autoRepair();
 		if (commitFailure) throw commitFailure;
 		stats = { ...stats, commits: committed.length, commitMs, rowsWritten };
 		if (signal.aborted) {
@@ -665,16 +747,18 @@ export class LanePool {
 		return makeLaneResult(frame.desc, frame.payload, { sliceId: 0, lane: laneId, attempts: 1 });
 	}
 
-	/** Probes every lane and reports which ones share an isolate. */
+	/** Probes every lane and spare and reports which ones share an isolate. */
 	async health(): Promise<PoolHealth> {
 		const t = laneTransport(this.ns);
+		const spares = new Set(this.spares());
 		const lanes = await Promise.all(
-			this.lanes().map(async (lane) => {
+			[...this.lanes(), ...spares].map(async (lane) => {
 				const h = (await (await t.send(lane, 'health', '{}')).json()) as {
 					iso: string;
 					tags: StateTags;
 				};
-				return { lane, isolate: h.iso, tags: h.tags };
+				this.learn(lane, h.tags, h.iso);
+				return { lane, isolate: h.iso, tags: h.tags, spare: spares.has(lane) };
 			})
 		);
 		const groups = new Map<string, string[]>();
@@ -686,7 +770,10 @@ export class LanePool {
 		};
 	}
 
-	/** Replaces all but one lane of every co-resident group with a fresh id, then probes again. */
+	/**
+	 * Replaces all but one member of every co-resident group, lanes and spares alike, with a fresh
+	 * id, then probes again.
+	 */
 	async repair(): Promise<PoolHealth> {
 		const before = await this.health();
 		for (const group of before.coResident) for (const lane of group.slice(1)) this.retire(lane);

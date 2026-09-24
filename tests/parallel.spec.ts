@@ -441,6 +441,15 @@ describe('LanePool runtime slices', () => {
 		expect(health.lanes.find((l) => l.lane === [...lanes][0])?.tags['warm:counter']).toBe(true);
 	});
 
+	it("runs one key's sticky slices in input order within a job", async () => {
+		const results = await pool({ size: 4 }).map({ runtime: 'counter', affinity: 'k' }, [
+			'a',
+			'b',
+			'c'
+		]);
+		expect(results.map((r) => r.text())).toEqual(['1:a\n', '2:b\n', '3:c\n']);
+	});
+
 	it('answers a non-zero exit as a result, not a failure', async () => {
 		const r = await pool().spawn({ runtime: 'counter', source: 'fail' });
 		expect(r.run?.exitCode).toBe(1);
@@ -513,6 +522,69 @@ describe('LanePool lane state', () => {
 			requires: { generation: 6 }
 		});
 		expect(r.text()).toBe('A');
+	});
+
+	it('places a slice on the lane its prefers matches', async () => {
+		const p = pool({ size: 3, hedge: false });
+		await p.call(p.lanes()[1]!, { task: 'setTags', input: '{"region":"x"}' });
+		await p.health();
+		for (let i = 0; i < 3; i++) {
+			const r = await p.spawn({ task: 'describe', prefers: { region: 'x' } });
+			expect(r.lane).toBe(p.lanes()[1]);
+		}
+	});
+
+	it('routes required slices only to lanes known to hold the state', async () => {
+		const p = pool({ size: 3, hedge: false });
+		await p.call(p.lanes()[2]!, { task: 'setTags', input: '{"generation":3}' });
+		await p.health();
+		const results = await p.map({ task: 'describe', requires: { generation: 3 } }, [
+			'a',
+			'b',
+			'c'
+		]);
+		expect(new Set(results.map((r) => r.lane))).toEqual(new Set([p.lanes()[2]]));
+		expect(p.lastStats).toMatchObject({ retries: 0, catchUps: 0 });
+	});
+
+	it('fails fast when no lane holds the state, and prepares them in the background', async () => {
+		const p = pool({ maxAttempts: 1 });
+		await p.health();
+		const e = await failure(
+			p.map({ task: 'upper', requires: { generation: 9 } }, ['a']),
+			'burrow.parallel.job_failed'
+		);
+		expect(e.causes[0]).toContain('preparing them in the background');
+		expect(p.lastStats?.catchUps).toBe(2);
+		await pause(150);
+		const [r] = await p.map({ task: 'upper', requires: { generation: 9 } }, ['a']);
+		expect(r!.text()).toBe('A');
+	});
+
+	it.each([false, true])(
+		'learns a stale lane from its refusal and catches it up (coordinator %s)',
+		async (coordinator) => {
+			const p = pool({ size: 1, spares: 1, maxAttempts: 2, hedge: false, coordinator });
+			const e = await failure(
+				p.map({ task: 'upper', requires: { generation: 10 } }, ['a']),
+				'burrow.parallel.job_failed'
+			);
+			expect(e.causes[0]).toContain('requires');
+			expect(p.lastStats?.catchUps).toBeGreaterThan(0);
+			await pause(150);
+			expect(
+				(await p.map({ task: 'upper', requires: { generation: 10 } }, ['a']))[0]!.text()
+			).toBe('A');
+		}
+	);
+
+	it('does not catch up when catch-up is off', async () => {
+		const p = pool({ size: 1, spares: 1, maxAttempts: 1, catchUp: false, hedge: false });
+		await failure(
+			p.map({ task: 'upper', requires: { generation: 12 } }, ['a']),
+			'burrow.parallel.job_failed'
+		);
+		expect(p.lastStats?.catchUps).toBe(0);
 	});
 
 	it('reports lanes whose prepare hook failed', async () => {
@@ -658,12 +730,35 @@ describe('LanePool raw access and health', () => {
 	it('finds lanes that share an isolate and repairs them', async () => {
 		const p = pool({ name: 'cohab', size: 3 });
 		const before = await p.health();
-		expect(before.isolates).toBe(1);
+		expect(before.lanes.filter((l) => l.spare)).toHaveLength(2);
+		expect(before.isolates).toBe(3);
 		expect(before.coResident).toEqual([['cohab/l0', 'cohab/l1', 'cohab/l2']]);
 		const after = await p.repair();
-		expect(after.isolates).toBe(3);
+		expect(after.isolates).toBe(5);
 		expect(after.coResident).toEqual([]);
 		expect(p.lanes()[0]).toBe('cohab/l0');
+	});
+
+	it('repairs lanes it saw sharing an isolate without being asked', async () => {
+		const p = pool({ name: 'cohab-auto', size: 3, hedge: false });
+		await p.map({ task: 'upper' }, ['a', 'b', 'c', 'd', 'e', 'f']);
+		expect(p.lanes().filter((l) => l.includes('~'))).toHaveLength(2);
+		expect((await p.health()).coResident).toEqual([]);
+	});
+
+	it('repairs a lane slot only once, so a pool that cannot separate does not churn', async () => {
+		const p = pool({ name: 'stuck', size: 2, spares: 0, hedge: false });
+		await p.map({ task: 'upper' }, ['a', 'b', 'c', 'd']);
+		const once = p.lanes();
+		expect(once[1]).toMatch(/~\d+$/);
+		await p.map({ task: 'upper' }, ['a', 'b', 'c', 'd']);
+		expect(p.lanes()).toEqual(once);
+	});
+
+	it('leaves co-resident lanes alone when auto repair is off', async () => {
+		const p = pool({ name: 'cohab-manual', size: 2, hedge: false, autoRepair: false });
+		await p.map({ task: 'upper' }, ['a', 'b', 'c', 'd']);
+		expect(p.lanes()).toEqual(['cohab-manual/l0', 'cohab-manual/l1']);
 	});
 
 	it('refuses a pool with no lanes', () => {
