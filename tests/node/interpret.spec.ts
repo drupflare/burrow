@@ -2,6 +2,15 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { InterpretError } from '../../src/errors.js';
 import { createInterpreter, DEFAULT_STACK_BYTES } from '../../src/interpret.js';
+import {
+	DATA,
+	DATA_WAT,
+	IMPURE,
+	IMPURE_WAT,
+	RANGE,
+	RANGE_TOTAL,
+	RANGE_WAT
+} from '../fixtures/guests.js';
 import { wat } from './wat.js';
 
 /**
@@ -365,5 +374,22 @@ describe('a module index the interpreter never issued', () => {
 		const vm = await fresh();
 		// the guard runs before the shim, so an empty range on a bad module is still not an error
 		expect(() => vm.tableClear(ABSENT, 0, 0)).not.toThrow();
+	});
+});
+
+// the parallel spec runs these under workerd, which cannot assemble wat, so they are pinned as bytes
+describe('the parallel guest fixtures', () => {
+	it('are the assembled bytes of their sources', () => {
+		expect(wat(RANGE_WAT)).toEqual(RANGE);
+		expect(wat(DATA_WAT)).toEqual(DATA);
+		expect(wat(IMPURE_WAT)).toEqual(IMPURE);
+	});
+
+	it('pin a reference total that any split of the range sums to', async () => {
+		const guest = (await fresh()).load(RANGE);
+		expect(guest.call('range', 0, 4096, 200) >>> 0).toBe(RANGE_TOTAL);
+		const halves =
+			(guest.call('range', 0, 1000, 200) + guest.call('range', 1000, 4096, 200)) >>> 0;
+		expect(halves).toBe(RANGE_TOTAL);
 	});
 });
