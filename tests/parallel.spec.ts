@@ -1114,6 +1114,23 @@ describe('LanePool against a broken transport', () => {
 		expect(e.message).toBe('quota spent');
 	});
 
+	// a wrong `binding` answered a bare "http 500" and the lane's own reason was thrown away
+	it('carries the reason a coordinator or lane refused with', async () => {
+		const unbound = fakeNamespace(
+			() => new Response('no namespace bound as BURROW_LANES', { status: 500 })
+		);
+		const job = await failure(
+			pool({ coordinator: true }, unbound).map({ task: 'upper' }, ['a']),
+			'burrow.parallel.job_failed'
+		);
+		expect(job.message).toContain('no namespace bound as BURROW_LANES');
+		const slice = await failure(
+			pool({}, unbound).call('x', { task: 'upper' }),
+			'burrow.parallel.slice_failed'
+		);
+		expect(slice.message).toContain('no namespace bound as BURROW_LANES');
+	});
+
 	it('surfaces a coordinator that reports its own failure', async () => {
 		const ns = fakeNamespace(() => records({ event: 'error', message: 'exploded' }));
 		const e = await failure(

@@ -396,7 +396,7 @@ export class LanePool {
 		);
 		if (!res.ok || !res.body) {
 			throw new ParallelError(
-				`coordinator ${coordinator} answered http ${res.status}`,
+				`coordinator ${coordinator} answered http ${res.status}: ${(await res.text()).slice(0, 160)}`,
 				'burrow.parallel.job_failed'
 			);
 		}
@@ -737,7 +737,7 @@ export class LanePool {
 		);
 		if (!res.ok)
 			throw new ParallelError(
-				`lane ${laneId} answered http ${res.status}`,
+				`lane ${laneId} answered http ${res.status}: ${(await res.text()).slice(0, 160)}`,
 				'burrow.parallel.slice_failed'
 			);
 		const frame = decodeFrame<ResultDesc | FailureDesc>(
