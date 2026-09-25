@@ -557,7 +557,9 @@ measured at 7 ms p50 on a deployed prototype, so a request with hundreds of quer
 it saves.</p>
 <p>Warm state belongs in module scope keyed by object id, which <code>defineLane</code> does for sticky runtime
 sessions. On a deployed probe, instance memory was gone after every idle of 15 s or more, while
-module-scope state survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.</p>
+module-scope state survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.
+Across an 8-hour run with jobs 5 minutes apart, 90% of lanes answered from a different isolate than
+the job before, so treat warm state as surviving short gaps, not idle periods of minutes.</p>
 <h3 id="sync" class="tsd-anchor-link">Sync<a href="#sync" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p><code>pool.atomic(key)</code> and <code>ctx.atomic(key)</code> reach one shared number with <code>load</code>, <code>store</code>, <code>add</code> and
 <code>compareExchange</code>, answering as <code>Atomics</code> does. Every op from a slice carries that slice's
