@@ -327,6 +327,16 @@ from the first consumer found two more: sticky sessions survived a change of lan
 module-level tag cache could hand `prepare` a stale view after an object moved between isolates,
 replaying a range the lane already held. Each is covered by a gate test that fails on the old code.
 
+An 8-hour run on the paid plan, one 32-lane job every 5 minutes through a coordinator, completed all
+97 jobs exactly with no missed interval: 79 hedges, no retries, co-residency in 8 jobs and each
+repaired, span p50 1,220 ms and p99 3,520 ms. It ran the build before the final scheduler changes
+and was not a release gate. Between consecutive jobs, 90% of lanes on average answered from a
+different isolate, against 8 of 8 module-scope states surviving a 120 s idle earlier; warm state
+outlives short gaps, not five-minute ones.
+
+On the free plan, once its daily rows quota had reset, the sync, channel, stateful and build arms
+passed 13 of 13 runs exactly, the stateful job again with 16 hedges and exactly 16 commits.
+
 Three runs on the free plan failed with a non-JSON error in the first minute after a fresh deploy,
 and none of 36 did afterwards. The cause was not attributed.
 

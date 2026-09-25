@@ -484,6 +484,8 @@ it saves.
 Warm state belongs in module scope keyed by object id, which `defineLane` does for sticky runtime
 sessions. On a deployed probe, instance memory was gone after every idle of 15 s or more, while
 module-scope state survived 8 of 8 idles of 120 s and was lost exactly when the isolate recycled.
+Across an 8-hour run with jobs 5 minutes apart, 90% of lanes answered from a different isolate than
+the job before, so treat warm state as surviving short gaps, not idle periods of minutes.
 
 ### Sync
 
