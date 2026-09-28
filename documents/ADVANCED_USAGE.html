@@ -1,5 +1,5 @@
-<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ADVANCED_USAGE | @drupflare/burrow - v1.1.1</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
-<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.1.1</a>
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>ADVANCED_USAGE | @drupflare/burrow - v1.2.0</title><meta name="description" content="Documentation for @drupflare/burrow"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="../index.html" class="title">@drupflare/burrow - v1.2.0</a>
 <div id="tsd-toolbar-links"></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
 <ul role="listbox" id="tsd-search-results"></ul>
 <div id="tsd-search-status" aria-live="polite" aria-atomic="true">
@@ -392,9 +392,10 @@ superinstruction work is already in the baseline: the vendored wasm3 folds opera
 operands, and fuses compare-with-branch, compare-with-if and producer-with-<code>local.set</code>.</p>
 <h3 id="what-the-vendored-interpreter-carries" class="tsd-anchor-link">What the vendored interpreter carries<a href="#what-the-vendored-interpreter-carries" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p><code>src/vendor/wasm3.wasm</code> is not stock wasm3. <code>tools/build-interp.sh</code> pins the upstream revision by
-SHA, applies three changes, and commits the result:</p>
+SHA, applies four changes, and commits the result:</p>
 <ul>
 <li>a fold of a loop's affine induction update into its back edge, which upstream has no equivalent of</li>
+<li>a fold of register spills into the op that produced the value, so the spill costs no dispatch</li>
 <li>a retype of the dispatch table from <code>funcref</code> to a non-nullable typed function reference, so V8
 stops emitting a signature check on every dispatch</li>
 <li>a catalog of fused handlers, one per operation sequence in <code>tools/interp/fuse-catalog.json</code>, each
@@ -411,6 +412,26 @@ LLVM has no <code>function-references</code> target feature and gives every C fu
 <p>Measured and rejected, so nobody re-buys them: skipping the memory bounds check is a net loss
 (geomean 1.038 and it gives up memory safety), and building the interpreter with LTO changes nothing
 (geomean 1.005) for 28 KB.</p>
+<h3 id="a-catalog-for-one-runtime" class="tsd-anchor-link">A Catalog for One Runtime<a href="#a-catalog-for-one-runtime" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The shipped catalog is mined from four unrelated guests so it carries to wasm it has never seen. A
+deployment that always runs the same runtime can build an interpreter with that runtime's own
+catalog. Against the old hand-written catalog, on the guest it was mined from, that measured
+1.10-1.32x faster at the default 64 entries and 1.26-1.89x at 256:</p>
+<pre><code class="sh"><span class="hl-0">bash</span><span class="hl-1"> </span><span class="hl-2">tools/interp/mine-catalog.sh</span><span class="hl-1"> </span><span class="hl-2">guest.json</span><span class="hl-1"> </span><span class="hl-2">guest.wasm:run:6</span><br/><span class="hl-4">BURROW_FUSE_CATALOG</span><span class="hl-1">=</span><span class="hl-2">guest.json</span><span class="hl-1"> </span><span class="hl-4">BURROW_INTERP_OUT</span><span class="hl-1">=</span><span class="hl-2">wasm3-guest.wasm</span><span class="hl-1"> </span><span class="hl-0">bash</span><span class="hl-1"> </span><span class="hl-2">tools/build-interp.sh</span>
+</code><button type="button">Copy</button></pre>
+
+<p>The guest is profiled under a counting build of the interpreter, <code>tools/seq-mine.ts</code> mines the
+executed operation stream into at most <code>BUDGET</code> sequences (64 by default), and the second command
+builds against them. Load the result with <code>createInterpreter({ module })</code> as usual. The profiling
+run answers imports with stubs, so a guest that needs real ones is traced from a driver that calls
+<code>profile()</code> in <code>tools/interp/trace.ts</code> after loading it itself. Mining also needs <code>bun</code>.</p>
+<p>With <code>ARTIFACTS=&lt;dir&gt;</code>, the mined catalog is kept in that directory under the module's sha256, and
+a later <code>mine-catalog.sh</code> for the same module takes it instead of profiling again. It is used only
+while burrow's version, the pinned wasm3 and the interpreter's patches, generator and miner are the
+ones it was mined under; otherwise the guest is mined afresh.</p>
+<pre><code class="sh"><span class="hl-4">ARTIFACTS</span><span class="hl-1">=</span><span class="hl-2">.burrow-catalogs</span><span class="hl-1"> </span><span class="hl-0">bash</span><span class="hl-1"> </span><span class="hl-2">tools/interp/mine-catalog.sh</span><span class="hl-1"> </span><span class="hl-2">guest.json</span><span class="hl-1"> </span><span class="hl-2">guest.wasm:run:6</span>
+</code><button type="button">Copy</button></pre>
+
 <h3 id="benchmark-rules" class="tsd-anchor-link">Benchmark Rules<a href="#benchmark-rules" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Three instrument bugs were caught while producing those numbers, each by disbelieving a flat line.
 The <code>bench</code> lane asserts all three as correctness checks:</p>
@@ -916,6 +937,7 @@ rather than an error.</p>
 <li><a href="#by-workload-shape-measured"><span>By workload shape, measured</span></a></li>
 <li><a href="#where-the-cost-comes-from"><span>Where the cost comes from</span></a></li>
 <li><a href="#what-the-vendored-interpreter-carries"><span>What the vendored interpreter carries</span></a></li>
+<li><a href="#a-catalog-for-one-runtime"><span>A <wbr/>Catalog for <wbr/>One <wbr/>Runtime</span></a></li>
 <li><a href="#benchmark-rules"><span>Benchmark <wbr/>Rules</span></a></li></ul></li>
 <li><a href="#memory-budgeting"><span>Memory <wbr/>Budgeting</span></a></li>
 <li><a href="#parallel-lanes"><span>Parallel <wbr/>Lanes</span></a></li>
@@ -942,7 +964,7 @@ rather than an error.</p>
 <li><a href="#etiquette"><span>Etiquette</span></a></li></ul></li>
 <li><a href="#things-that-will-bite-you"><span>Things <wbr/>That <wbr/>Will <wbr/>Bite <wbr/>You</span></a></li></ul></div></details></div>
 <div class="site-menu">
-<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.1.1</a>
+<nav class="tsd-navigation"><a href="../modules.html">@drupflare/burrow - v1.2.0</a>
 <ul class="tsd-small-nested-navigation" id="tsd-nav-container">
 <li>Loading...</li></ul></nav></div></div></div><footer>
 <p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
