@@ -320,3 +320,151 @@ export function readFunctionBodies(wasm: Uint8Array): Op[][] {
 	}
 	return bodies;
 }
+
+/** @internal each section's id and the byte range of its contents, stopping at the first bad one */
+function* sections(wasm: Uint8Array): Generator<{ id: number; at: number; end: number }> {
+	if (wasm.length < 8 || wasm[0] !== 0x00 || wasm[1] !== 0x61) return;
+	let at = 8;
+	while (at < wasm.length) {
+		const id = wasm[at++] as number;
+		let size: number;
+		[size, at] = leb(wasm, at);
+		if (at < 0 || at + size > wasm.length) return;
+		yield { id, at, end: at + size };
+		at += size;
+	}
+}
+
+/** @internal a length-prefixed UTF-8 name, and where it ends */
+function name(wasm: Uint8Array, at: number): [string, number] {
+	let length: number;
+	[length, at] = leb(wasm, at);
+	if (at < 0) return ['', -1];
+	return [new TextDecoder().decode(wasm.subarray(at, at + length)), at + length];
+}
+
+/** a function import, with its signature in wasm3 notation */
+export interface FunctionImport {
+	module: string;
+	field: string;
+	/** e.g. `i(iI)` for `(i32, i64) -> i32`; null when a value type has no wasm3 letter */
+	signature: string | null;
+}
+
+const LETTER: Record<number, string> = { 0x7f: 'i', 0x7e: 'I', 0x7d: 'f', 0x7c: 'F' };
+
+/** Every function a module imports, in import order. */
+export function readImports(wasm: Uint8Array): FunctionImport[] {
+	const types: (string | null)[] = [];
+	const out: FunctionImport[] = [];
+	for (const { id, at: start } of sections(wasm)) {
+		if (id !== 1 && id !== 2) continue;
+		let at = start;
+		let count: number;
+		[count, at] = leb(wasm, at);
+		if (id === 1) {
+			for (let i = 0; i < count && at >= 0; i++) {
+				at++; // 0x60, a function type
+				const vec = (): string[] | null => {
+					let n: number;
+					[n, at] = leb(wasm, at);
+					const letters: string[] = [];
+					let known = true;
+					for (let j = 0; j < n; j++) {
+						const letter = LETTER[wasm[at++] as number];
+						if (letter) letters.push(letter);
+						else known = false;
+					}
+					return known ? letters : null;
+				};
+				const params = vec();
+				const results = vec();
+				types.push(params && results ? `${results[0] ?? 'v'}(${params.join('')})` : null);
+			}
+		} else if (id === 2) {
+			for (let i = 0; i < count && at >= 0; i++) {
+				let module: string;
+				let field: string;
+				[module, at] = name(wasm, at);
+				[field, at] = name(wasm, at);
+				const kind = wasm[at++] as number;
+				if (kind === 0x00) {
+					let type: number;
+					[type, at] = leb(wasm, at);
+					out.push({ module, field, signature: types[type] ?? null });
+				} else if (kind === 0x03) {
+					at += 2;
+				} else {
+					if (kind === 0x01) at++;
+					const flags = wasm[at++] as number;
+					at = skipLeb(wasm, at);
+					if (at >= 0 && flags === 0x01) at = skipLeb(wasm, at);
+				}
+			}
+			return out;
+		}
+	}
+	return out;
+}
+
+/**
+ * The name of the function in each slot of table 0, from its active element segments and the
+ * name section. A C function pointer in a wasm32 build is its table slot, so this is what turns a
+ * handler pointer read out of an interpreter's code back into a handler name.
+ */
+export function readTableNames(wasm: Uint8Array): Map<number, string> {
+	const slots = new Map<number, number>();
+	const names = new Map<number, string>();
+	for (const { id, at: start, end } of sections(wasm)) {
+		let at = start;
+		if (id === 9) {
+			let count: number;
+			[count, at] = leb(wasm, at);
+			for (let s = 0; s < count && at >= 0; s++) {
+				let flags: number;
+				[flags, at] = leb(wasm, at);
+				// only the active, table 0, function index form a linker emits
+				if (flags !== 0 || wasm[at] !== 0x41) break;
+				let base: number;
+				[base, at] = leb(wasm, at + 1);
+				if (wasm[at++] !== 0x0b) break;
+				let n: number;
+				[n, at] = leb(wasm, at);
+				for (let i = 0; i < n && at >= 0; i++) {
+					let fn: number;
+					[fn, at] = leb(wasm, at);
+					slots.set(base + i, fn);
+				}
+			}
+		} else if (id === 0) {
+			let section: string;
+			[section, at] = name(wasm, at);
+			if (section !== 'name') continue;
+			while (at >= 0 && at < end) {
+				const sub = wasm[at++] as number;
+				let size: number;
+				[size, at] = leb(wasm, at);
+				if (at < 0) break;
+				if (sub === 1) {
+					let n: number;
+					let cursor: number;
+					[n, cursor] = leb(wasm, at);
+					for (let i = 0; i < n && cursor >= 0; i++) {
+						let fn: number;
+						let label: string;
+						[fn, cursor] = leb(wasm, cursor);
+						[label, cursor] = name(wasm, cursor);
+						names.set(fn, label);
+					}
+				}
+				at += size;
+			}
+		}
+	}
+	const out = new Map<number, string>();
+	for (const [slot, fn] of slots) {
+		const label = names.get(fn);
+		if (label !== undefined) out.set(slot, label);
+	}
+	return out;
+}

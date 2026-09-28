@@ -45,20 +45,48 @@ static int fuse_match(u32 i_at, const BurrowFuse* i_e) {
 	return 1;
 }
 
+/* catalog entries ordered by head op, so a site only compares the entries it could start */
+static u16 g_fuse_order[BURROW_FUSE_N];
+static int g_fuse_ordered;
+
+static uintptr_t fuse_head(u32 i_k) {
+	return (uintptr_t) g_burrow_fuse[g_fuse_order[i_k]].want[0];
+}
+
+static int fuse_cmp(const void* i_a, const void* i_b) {
+	uintptr_t a = (uintptr_t) g_burrow_fuse[*(const u16*) i_a].want[0];
+	uintptr_t b = (uintptr_t) g_burrow_fuse[*(const u16*) i_b].want[0];
+	return a < b ? -1 : a > b;
+}
+
 /* overwrites the head of every matched tile with its fused handler; answers how many fired */
 u32 burrow_fuse_apply(void) {
 	if (!g_rec_pc || g_rec_done == g_rec_n) return 0;
+	if (!g_fuse_ordered) {
+		for (u32 e = 0; e < BURROW_FUSE_N; ++e) g_fuse_order[e] = (u16) e;
+		qsort(g_fuse_order, BURROW_FUSE_N, sizeof(u16), fuse_cmp);
+		g_fuse_ordered = 1;
+	}
 
+	g_fuse_patched = 0;
 	for (u32 i = g_rec_done; i < g_rec_n;) {
+		uintptr_t op = (uintptr_t) fuse_at(g_rec_pc[i]);
+		u32 lo = 0, hi = BURROW_FUSE_N;
+		while (lo < hi) {
+			u32 mid = (lo + hi) / 2;
+			if (fuse_head(mid) < op)
+				lo = mid + 1;
+			else
+				hi = mid;
+		}
 		u32 best = BURROW_FUSE_N;
 		u8 bestn = 0;
-		for (u32 e = 0; e < BURROW_FUSE_N; ++e) {
-			const BurrowFuse* ent = &g_burrow_fuse[e];
+		for (u32 k = lo; k < BURROW_FUSE_N && fuse_head(k) == op; ++k) {
+			const BurrowFuse* ent = &g_burrow_fuse[g_fuse_order[k]];
 			// longest tile wins, so a two-op match never shadows a longer one at the same position
 			if (ent->n <= bestn) continue;
-			if (fuse_at(g_rec_pc[i]) != ent->want[0]) continue;
 			if (!fuse_match(i, ent)) continue;
-			best = e;
+			best = g_fuse_order[k];
 			bestn = ent->n;
 		}
 		if (best == BURROW_FUSE_N) {

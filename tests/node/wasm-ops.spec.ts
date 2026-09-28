@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { countImportedFunctions, readFunctionBodies, readOps } from '../../tools/wasm-ops.js';
+import {
+	countImportedFunctions,
+	readFunctionBodies,
+	readImports,
+	readOps,
+	readTableNames
+} from '../../tools/wasm-ops.js';
 import { wat } from './wat.js';
 
 /**
@@ -187,5 +193,60 @@ describe('countImportedFunctions', () => {
 		const bodies = readFunctionBodies(bytes);
 		const call = (bodies[1] ?? []).find((op) => op.name === 'call');
 		expect(bodies[(call?.index as number) - imported]?.[0]?.name).toBe('i32.const');
+	});
+});
+
+describe('readImports', () => {
+	it('answers each function import with its signature in wasm3 notation', () => {
+		const bytes = wat(`(module
+		  (import "env" "now" (func (result i64)))
+		  (import "e" "m" (memory 1))
+		  (import "wasi" "seek" (func (param i32 i64 i32) (result i32)))
+		  (import "e" "g" (global i32))
+		  (import "env" "log" (func (param f32 f64))))`);
+		expect(readImports(bytes)).toEqual([
+			{ module: 'env', field: 'now', signature: 'I()' },
+			{ module: 'wasi', field: 'seek', signature: 'i(iIi)' },
+			{ module: 'env', field: 'log', signature: 'v(fF)' }
+		]);
+	});
+
+	it('answers a null signature for a value type wasm3 has no letter for', () => {
+		const bytes = wat('(module (import "e" "r" (func (param externref))))');
+		expect(readImports(bytes)).toEqual([{ module: 'e', field: 'r', signature: null }]);
+	});
+
+	it('answers nothing for bytes that are not wasm, or import nothing', () => {
+		expect(readImports(new Uint8Array([1, 2, 3]))).toEqual([]);
+		expect(readImports(wat('(module (func))'))).toEqual([]);
+	});
+});
+
+describe('readTableNames', () => {
+	it('names the function in each table slot', () => {
+		const bytes = wat(
+			`(module
+			  (table 4 funcref)
+			  (func $a) (func $b) (func $c)
+			  (elem (i32.const 1) $c $a))`,
+			{ names: true }
+		);
+		expect([...readTableNames(bytes)]).toEqual([
+			[1, 'c'],
+			[2, 'a']
+		]);
+	});
+
+	it('answers nothing without a name section', () => {
+		const bytes = wat('(module (table 1 funcref) (func $a) (elem (i32.const 0) $a))');
+		expect(readTableNames(bytes).size).toBe(0);
+	});
+
+	it('stops at an element segment in a form a linker does not emit', () => {
+		const bytes = wat(
+			`(module (table 2 funcref) (func $a) (elem declare func $a) (elem (i32.const 0) $a))`,
+			{ names: true }
+		);
+		expect(readTableNames(bytes).size).toBe(0);
 	});
 });

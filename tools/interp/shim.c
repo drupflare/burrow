@@ -321,7 +321,12 @@ static int64_t call_function(IM3Function f, int32_t a0, int32_t a1, int32_t a2, 
 #if d_m3Fuse
 	// wasm3 compiles a function on first call, so fusing before each call catches what the last one
 	// emitted; the pass only walks operations recorded since it last ran
+	#if d_burrowProfile
+	extern int g_prof_nofuse;
+	if (!g_prof_nofuse) burrow_fuse_apply();
+	#else
 	burrow_fuse_apply();
+	#endif
 #endif
 	const void* args[4] = {&a0, &a1, &a2, &a3};
 	uint32_t n = m3_GetArgCount(f);

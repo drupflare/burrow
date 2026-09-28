@@ -12,9 +12,13 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const [catalogPath, execPath, outPath] = process.argv.slice(2);
-if (!catalogPath || !execPath || !outPath) {
-	console.error('usage: gen-fuse.mjs <catalog.json> <m3_exec.h> <out.h>');
+// --list prints the operations a tile may contain, which is what a trace producer cuts runs at
+const listing = process.argv[2] === '--list';
+const [catalogPath, execPath, outPath] = listing
+	? [undefined, process.argv[3], undefined]
+	: process.argv.slice(2);
+if (!execPath || (!listing && (!catalogPath || !outPath))) {
+	console.error('usage: gen-fuse.mjs <catalog.json> <m3_exec.h> <out.h> | --list <m3_exec.h>');
 	process.exit(2);
 }
 
@@ -23,7 +27,6 @@ const fail = (why) => {
 	process.exit(1);
 };
 
-const { handlers, widths } = JSON.parse(readFileSync(catalogPath, 'utf8'));
 const src = readFileSync(execPath, 'utf8');
 
 /** which macro invocation defines each handler, so it can be re-instantiated in step mode */
@@ -80,6 +83,16 @@ const STANDALONE = {
 		'd_m3Op(PreserveCopySlot_32)\n{\n\tu32* dest = slot_ptr(u32);\n\tu32* src = slot_ptr(u32);\n\tu32* preserve = slot_ptr(u32);\n\t*preserve = *dest;\n\t*dest = *src;\n\tnextOpPreloaded();\n}'
 };
 
+if (listing) {
+	console.log(JSON.stringify([...defs.keys(), ...Object.keys(STANDALONE)].sort()));
+	process.exit(0);
+}
+
+const { handlers, widths } = JSON.parse(readFileSync(catalogPath, 'utf8'));
+// the runtime indexes entries in a u16 and counts a tile's operations in a u8
+if (!handlers.length || handlers.length > 65535) fail(`catalog has ${handlers.length} entries`);
+for (const h of handlers)
+	if (h.length < 2 || h.length > 255) fail(`tile of ${h.length} operations`);
 const need = [...new Set(handlers.flat())].sort();
 const invs = [];
 const standalone = [];

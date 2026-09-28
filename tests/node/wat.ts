@@ -29,10 +29,11 @@ const assembler = await wabt();
  *
  * @internal
  */
-export function wat(source: string): Uint8Array {
+export function wat(source: string, options: { names?: boolean } = {}): Uint8Array {
 	const module = assembler.parseWat('fixture.wat', source, FEATURES);
 	try {
-		return module.toBinary({}).buffer;
+		if (options.names) module.resolveNames();
+		return module.toBinary({ write_debug_names: options.names ?? false }).buffer;
 	} finally {
 		module.destroy();
 	}

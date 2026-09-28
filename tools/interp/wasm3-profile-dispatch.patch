@@ -1,0 +1,17 @@
+--- a/m3_exec_defs.h
++++ b/m3_exec_defs.h
+@@ -59,8 +59,14 @@
+ #  define jumpOpImpl(PC)            ((IM3Operation)(*  PC))( PC + 1, d_m3OpArgs)
+ #endif
+ 
++#if d_burrowProfile
++void burrow_prof_hit (pc_t i_pc);
++#define nextOpDirect()              do { burrow_prof_hit (_pc); M3_MUSTTAIL return nextOpImpl(); } while (0)
++#define jumpOpDirect(PC)            do { pc_t _jpc = (pc_t)(PC); burrow_prof_hit (_jpc); M3_MUSTTAIL return jumpOpImpl(_jpc); } while (0)
++#else
+ #define nextOpDirect()              M3_MUSTTAIL return nextOpImpl()
+ #define jumpOpDirect(PC)            M3_MUSTTAIL return jumpOpImpl((pc_t)(PC))
++#endif
+ 
+ #if (d_m3EnableOpProfiling || d_m3EnableOpTracing)
+ d_m3RetSig RunCode (d_m3OpSig, cstr_t i_operationName)
