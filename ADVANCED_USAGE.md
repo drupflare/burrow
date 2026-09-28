@@ -299,9 +299,10 @@ operands, and fuses compare-with-branch, compare-with-if and producer-with-`loca
 ### What the vendored interpreter carries
 
 `src/vendor/wasm3.wasm` is not stock wasm3. `tools/build-interp.sh` pins the upstream revision by
-SHA, applies three changes, and commits the result:
+SHA, applies four changes, and commits the result:
 
 - a fold of a loop's affine induction update into its back edge, which upstream has no equivalent of
+- a fold of register spills into the op that produced the value, so the spill costs no dispatch
 - a retype of the dispatch table from `funcref` to a non-nullable typed function reference, so V8
   stops emitting a signature check on every dispatch
 - a catalog of fused handlers, one per operation sequence in `tools/interp/fuse-catalog.json`, each
@@ -321,6 +322,33 @@ LLVM has no `function-references` target feature and gives every C function poin
 Measured and rejected, so nobody re-buys them: skipping the memory bounds check is a net loss
 (geomean 1.038 and it gives up memory safety), and building the interpreter with LTO changes nothing
 (geomean 1.005) for 28 KB.
+
+### A Catalog for One Runtime
+
+The shipped catalog is mined from four unrelated guests so it carries to wasm it has never seen. A
+deployment that always runs the same runtime can build an interpreter with that runtime's own
+catalog. Against the old hand-written catalog, on the guest it was mined from, that measured
+1.10-1.32x faster at the default 64 entries and 1.26-1.89x at 256:
+
+```sh
+bash tools/interp/mine-catalog.sh guest.json guest.wasm:run:6
+BURROW_FUSE_CATALOG=guest.json BURROW_INTERP_OUT=wasm3-guest.wasm bash tools/build-interp.sh
+```
+
+The guest is profiled under a counting build of the interpreter, `tools/seq-mine.ts` mines the
+executed operation stream into at most `BUDGET` sequences (64 by default), and the second command
+builds against them. Load the result with `createInterpreter({ module })` as usual. The profiling
+run answers imports with stubs, so a guest that needs real ones is traced from a driver that calls
+`profile()` in `tools/interp/trace.ts` after loading it itself. Mining also needs `bun`.
+
+With `ARTIFACTS=<dir>`, the mined catalog is kept in that directory under the module's sha256, and
+a later `mine-catalog.sh` for the same module takes it instead of profiling again. It is used only
+while burrow's version, the pinned wasm3 and the interpreter's patches, generator and miner are the
+ones it was mined under; otherwise the guest is mined afresh.
+
+```sh
+ARTIFACTS=.burrow-catalogs bash tools/interp/mine-catalog.sh guest.json guest.wasm:run:6
+```
 
 ### Benchmark Rules
 

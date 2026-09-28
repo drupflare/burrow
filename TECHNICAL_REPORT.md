@@ -152,8 +152,9 @@ there.
 ## The Interpreter Build
 
 `src/vendor/wasm3.wasm` is not stock wasm3. `tools/build-interp.sh` pins upstream by SHA, applies
-three changes and commits the result. The binary is reproducible: two consecutive builds are
-byte-identical.
+four changes and commits the result. The binary is reproducible: two builds from different
+directories are byte-identical, because `-ffile-prefix-map` keeps the build path out of wasm3's
+`__FILE__` strings.
 
 **A typed dispatch table.** V8 emits a runtime signature check on `call_indirect` because a `funcref`
 table's entry signatures are not static. Retyping the table to a non-nullable `(ref 0)` makes the
@@ -170,12 +171,44 @@ orders. A companion compare fold measured 2.0% faster in the toggle harness and 
 rebuilt in the form it would actually ship**, so it was refused. That gap is the argument for
 measuring the artifact rather than the experiment.
 
-**A fusion catalog.** 170 fused handlers over 340 operations, one per sequence in
+**A spill fold.** wasm3 has one integer register, so a second live value spills the first with a
+`SetSlot`. That op was 8.9-13.5% of executed operations on zlib, libjpeg, Lua 5.5 and SQLite. The
+fold writes the spill from the op that produced the value, by retro-patching it to its existing
+destination-slot variant, or, when a tee has already put the value in a local and nothing has run
+since, points the stack entry at that local and emits nothing. It adds no handlers. Executed
+operations fall 7.5-12.6% unfused. Measured locally under node, time moves between 0.6% slower
+(SQLite) and 11.9% faster (libjpeg) unfused, and 3.3-5.1% faster with the old hand-written catalog
+(Lua within noise). The wasm core spec suite passes in full on a native build
+with the fold: 27,277 of 27,277 at wg-3.0 and 27,693 of 27,693 at wg-2.0.
+
+**A fusion catalog.** 1,024 fused handlers over 2,048 operations, one per sequence in
 `tools/interp/fuse-catalog.json`, generated at build time from wasm3's own operation macros so a
 fused handler carries wasm3's semantics rather than a hand-written copy. Guests are matched against
 the catalog after they compile and the head of each match is overwritten. This is data, not code
 generation. `Interpreter.fusedSequences` reports how many sequences fired, and the gate asserts it is
-non-zero, because a test that passes whether or not the mechanism engages proves nothing.
+non-zero, because a test that passes whether or not the mechanism engages proves nothing. Matching
+bisects a head-sorted index, so the pass costs the same at 1,024 entries as at 170; unindexed, it
+added about 70 ms to SQLite's second call.
+
+The catalog is mined rather than written. `tools/interp/mine-catalog.sh` profiles the four guests in
+`tools/interp/guests` under a counting build, and `tools/seq-mine.ts` merges byte-pair style over
+the executed stream, each guest weighed equally, sequences capped at two operations. Mined from
+three guests and run on the fourth, it beats the previous 170-entry hand catalog on every one:
+
+| held-out guest | time against the hand catalog | dispatches removed, hand / mined |
+| -------------- | ----------------------------- | -------------------------------- |
+| zlib           | 0.929                         | 23.6% / 27.8%                    |
+| libjpeg        | 0.942                         | 29.6% / 35.4%                    |
+| Lua 5.5        | 0.921                         | 7.8% / 21.9%                     |
+| SQLite         | 0.944                         | 6.3% / 21.2%                     |
+
+The hand catalog was built from zlib and libjpeg, so its first two rows are in sample and the
+mined one still wins. The shipped catalog, mined from all four, reads 0.839-0.860 against the
+previous binary on those four guests; that figure is in sample.
+
+A catalog mined from one guest alone is the per-runtime option, built with
+`BURROW_FUSE_CATALOG`. Against the hand catalog, 64 entries read 0.757-0.908 and 256 entries
+0.530-0.792 on the guest they were mined from.
 
 Fusion research established the shape of the mechanism, all measured with one binary and a runtime
 arm toggle so layout is identical across arms:
@@ -210,6 +243,7 @@ Recorded so nobody re-buys them. Each closed a mechanism; none closed the object
 | profile-guided handler layout | V8 compiles lazily and allocates in first-execution order                  |
 | the escape executor           | 2.6% **slower** than the interpreter on its own real tile                  |
 | a new guest IR                | operand movement is 10-17% of retired operations, so it caps at 1.11-1.20x |
+| constant-immediate operands   | 1.006 on zlib at 5.7% of its operations, 1.041 slower on libjpeg           |
 | whole-function memoization    | no hot function on any real guest is pure                                  |
 | predication                   | loses 4.0-4.3% on the most favourable shape that exists                    |
 | batch trace weaving           | 1.30x to the interpreter and **2.3-3.4x worse against native**             |

@@ -112,8 +112,11 @@ Never quote one ratio. Quote the law and the guest's character.
 - Every behaviour change ships with its test in the same change, and one spec file per domain — fold
   a new case into the existing spec rather than adding a parallel `*-extra.spec.ts`.
 - No runtime is vendored. The consumer supplies it. The only wasm in the package is the interpreter,
-  checked in with the script that built it. wasm3 is pinned by SHA and carries three burrow patches;
-  `tools/build-interp.sh` is the whole story and the binary is reproducible from it.
+  checked in with the script that built it. wasm3 is pinned by SHA and carries the patches in
+  `tools/interp/`; `tools/build-interp.sh` is the whole story and the binary is reproducible from it,
+  byte for byte from any build directory.
+- The fusion catalog is mined, not written: `tools/interp/mine-catalog.sh` over
+  `tools/interp/guests` with `BUDGET=1024 MAX_WIDTH=2`. Regenerate it that way; do not hand-edit it.
 
 ## Benchmark rules
 
