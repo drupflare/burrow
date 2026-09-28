@@ -316,6 +316,106 @@ describe('loops, against V8 running the same bytes', () => {
 });
 
 /**
+ * wasm3 has one integer register, so a second live value spills the first. The vendored build folds
+ * that spill into the op that produced the value, or, after a tee, points at the local the tee wrote.
+ * The second is only right while nothing rewrites the local, so the shapes below rewrite it with the
+ * spilled value still on the stack, inside a block, an if and a call.
+ */
+describe('register spills, against V8 running the same bytes', () => {
+	const SPILLS = `(module
+	  (memory 1)
+	  (data (i32.const 0) "\\05\\00\\00\\00\\09\\00\\00\\00\\fe\\ff\\ff\\ff")
+	  (func $pair (param i32 i32) (result i32) (i32.sub (local.get 0) (local.get 1)))
+	  (func (export "twoLive") (param $a i32) (param $b i32) (result i32)
+	    (i32.mul (i32.add (local.get $a) (local.get $b)) (i32.sub (local.get $a) (local.get $b))))
+	  (func (export "loads") (param $a i32) (param $b i32) (result i32)
+	    (i32.add (i32.load (i32.and (local.get $a) (i32.const 8)))
+	      (i32.load (i32.and (local.get $b) (i32.const 4)))))
+	  (func (export "callArgs") (param $a i32) (param $b i32) (result i32)
+	    (call $pair (i32.add (local.get $a) (local.get $b)) (i32.mul (local.get $a) (local.get $b))))
+	  (func (export "teeKept") (param $a i32) (param $b i32) (result i32)
+	    (local $x i32)
+	    (i32.add (local.tee $x (i32.add (local.get $a) (i32.const 1)))
+	      (i32.mul (local.get $x) (local.get $b))))
+	  (func (export "teeRewrittenInBlock") (param $a i32) (param $b i32) (result i32)
+	    (local $x i32)
+	    (i32.sub (local.tee $x (i32.add (local.get $a) (local.get $b)))
+	      (block (result i32)
+	        (local.set $x (i32.const 100))
+	        (i32.mul (local.get $x) (local.get $b)))))
+	  (func (export "teeRewrittenInIf") (param $a i32) (param $b i32) (result i32)
+	    (local $x i32)
+	    (i32.add (local.tee $x (i32.shl (local.get $a) (i32.const 2)))
+	      (if (result i32) (local.get $b)
+	        (then (local.set $x (i32.const 5)) (i32.mul (local.get $x) (local.get $a)))
+	        (else (i32.const 9)))))
+	  (func (export "teeRewrittenByCall") (param $a i32) (param $b i32) (result i32)
+	    (local $x i32)
+	    (i32.xor (local.tee $x (i32.add (local.get $a) (i32.const 7)))
+	      (call $pair (local.tee $x (i32.mul (local.get $b) (i32.const 3))) (local.get $x))))
+	  (func (export "teeThenSet") (param $a i32) (param $b i32) (result i32)
+	    (local $x i32)
+	    local.get $a
+	    i32.const 1
+	    i32.add
+	    local.tee $x
+	    local.get $b
+	    local.set $x
+	    local.get $x
+	    i32.const 3
+	    i32.mul
+	    i32.add)
+	  (func (export "wide") (param $a i32) (param $b i32) (result i32)
+	    (i32.wrap_i64 (i64.mul (i64.add (i64.extend_i32_s (local.get $a)) (i64.const 3))
+	      (i64.sub (i64.extend_i32_s (local.get $b)) (i64.const 11)))))
+	)`;
+
+	const SHAPES = [
+		'twoLive',
+		'loads',
+		'callArgs',
+		'teeKept',
+		'teeRewrittenInBlock',
+		'teeRewrittenInIf',
+		'teeRewrittenByCall',
+		'teeThenSet',
+		'wide'
+	] as const;
+	const ARGS = [
+		[0, 0],
+		[3, 4],
+		[-7, 2],
+		[12, 0],
+		[2147483647, 5]
+	] as const;
+
+	it('answers what V8 answers, on every shape and argument', async () => {
+		const bytes = wat(SPILLS);
+		const Module = WebAssembly.Module as unknown as new (b: BufferSource) => WebAssembly.Module;
+		const native = (await WebAssembly.instantiate(new Module(bytes), {}))
+			.exports as unknown as Record<
+			(typeof SHAPES)[number],
+			(a: number, b: number) => number
+		>;
+		const guest = (await fresh()).load(bytes);
+
+		// anchored absolutely, so two paths that both answer nothing cannot agree; an i32 result comes
+		// back unsigned, hence the | 0
+		expect(guest.call('twoLive', 3, 4) | 0).toBe(-7);
+		for (const shape of SHAPES) {
+			for (const [a, b] of ARGS) {
+				expect([shape, a, b, guest.call(shape, a, b) | 0]).toEqual([
+					shape,
+					a,
+					b,
+					native[shape](a, b)
+				]);
+			}
+		}
+	});
+});
+
+/**
  * Every entry point answers a negative return code from the shim with a coded error rather than a
  * bare throw or a silent wrong answer. A module index the shim has never issued reaches all of them
  * through one door, since `at()` rejects it.

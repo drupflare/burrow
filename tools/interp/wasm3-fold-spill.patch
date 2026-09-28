@@ -1,0 +1,108 @@
+--- a/m3_config.h
++++ b/m3_config.h
+@@ -230,6 +230,13 @@
+ #  undef d_m3FoldLoopBackEdge
+ #  define d_m3FoldLoopBackEdge                 0       // the candidate tracking lives in the fold machinery
+ #endif
++#ifndef d_m3FoldSpill
++#  define d_m3FoldSpill                        1       // spill a register by retro-patching its producer
++#endif                                                 // or by pointing at the local a tee just wrote
++#if d_m3FoldSpill && !d_m3FoldSetLocal
++#  undef d_m3FoldSpill
++#  define d_m3FoldSpill                        0       // the candidate tracking lives in the fold machinery
++#endif
+ 
+ #if d_m3FuseBranch && !d_m3FoldSetLocal
+ #  undef d_m3FuseBranch
+--- a/m3_compile.h
++++ b/m3_compile.h
+@@ -210,6 +210,12 @@
+     m3opcode_t foldOpcode;
+     u16        foldStackIndex;             // stack index of the candidate's pushed result
+     u8         foldForm;                   // operand-form index the candidate was emitted with
++#endif
++#if d_m3FoldSpill
++    // a tee folded its value into this local and left it in the register; 0 once anything is
++    // emitted, since the local could then have changed
++    u16        teeSlotPlusOne;
++    u16        teeStackIndex;
+ #endif
+ } M3Compilation;
+ 
+--- a/m3_compile.c
++++ b/m3_compile.c
+@@ -68,6 +68,9 @@
+ #if d_m3FoldLoopBackEdge
+     o->loopFoldPC = NULL;
+ #endif
++#if d_m3FoldSpill
++    o->teeSlotPlusOne = 0;
++#endif
+ #if d_m3FoldSetLocal
+     o->foldPatchPC = NULL;
+ #elif !d_m3FoldLoopBackEdge
+@@ -801,12 +804,33 @@
+         DeallocateRegister(o, regSelect);
+ 
+         m3type_t type = GetStackTypeFromBottom(o, stackIndex);
++
++#if d_m3FoldSpill
++        // a tee already put this value in a local and nothing has run since, so that slot is it
++        if (o->teeSlotPlusOne and o->teeStackIndex == stackIndex) {
++            o->wasmStack[stackIndex] = o->teeSlotPlusOne - 1;
++            o->teeSlotPlusOne = 0;
++            return result;
++        }
++#endif
+ 
+         // and point to a exec slot
+         u16 slot = c_slotUnused;
+ _       (AllocateSlots(o, &slot, type));
+         o->wasmStack[stackIndex] = slot;
+ 
++#if d_m3FoldSpill
++        // the producer is the last op emitted, so it can write the slot itself
++        IM3Operation foldOp = (o->foldPatchPC and o->foldStackIndex == stackIndex)
++                                ? GetFoldOp(o->foldOpcode, o->foldForm) : NULL;
++        if (foldOp) {
++            *(IM3Operation*)o->foldPatchPC = foldOp;
++            EmitSlotOffset(o, slot);
++            InvalidateFold(o);
++            return result;
++        }
++#endif
++
+         // Ensure type is within the valid range
+         if (M3_LIKELY(BaseTypeOf(type) < c_m3Type_count)) {
+ _           (EmitOp(o, c_setSetOps[BaseTypeOf(type)]));
+@@ -1156,6 +1180,18 @@
+ 
+     if (inRegister) {
+         op = c_setSetOps[BaseTypeOf(type)];
++
++#if d_m3FoldSpill
++        // a folded op writes the register too, so the value stays where the stack says it is
++        IM3Operation foldOp = (o->foldPatchPC and o->foldStackIndex == i_stackIndex)
++                                ? GetFoldOp(o->foldOpcode, o->foldForm) : NULL;
++        if (foldOp) {
++            *(IM3Operation*)o->foldPatchPC = foldOp;
++            EmitSlotOffset(o, i_destSlot);
++            InvalidateFold(o);
++            return result;
++        }
++#endif
+     } else {
+         op = Is64BitType(type) ? op_CopySlot_64 : op_CopySlot_32;
+     }
+@@ -1681,6 +1717,11 @@
+             if (i_opcode == c_waOp_teeLocal) {
+ _               (PushRegister(o, type));
+ 
++#if d_m3FoldSpill
++                o->teeSlotPlusOne = localSlot + 1;
++                o->teeStackIndex  = (u16) GetStackTopIndex(o);
++#endif
++
+ #if d_m3FoldLoopBackEdge
+                 // the value is now in the local's slot AND on top in the register: a br_if
+                 // closing a loop can absorb the whole thing
