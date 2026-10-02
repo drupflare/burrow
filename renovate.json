@@ -8,7 +8,7 @@
 			"matchUpdateTypes": ["minor", "patch", "pin", "digest"]
 		},
 		{
-			"matchPackageNames": ["typescript"],
+			"matchPackageNames": ["typescript", "vitest", "@vitest/**"],
 			"matchUpdateTypes": ["major"],
 			"enabled": false
 		}
