@@ -5,7 +5,13 @@
 	"rebaseWhen": "behind-base-branch",
 	"packageRules": [
 		{
-			"matchUpdateTypes": ["minor", "patch", "pin", "digest"]
+			"matchUpdateTypes": ["minor", "patch", "pin"]
+		},
+		{
+			"description": "a digest-only bump re-runs every lane for no version change; the pin moves with the next tag",
+			"matchDatasources": ["docker"],
+			"matchUpdateTypes": ["digest"],
+			"enabled": false
 		},
 		{
 			"matchPackageNames": ["typescript", "vitest", "@vitest/**"],
