@@ -120,7 +120,7 @@ jobs:
         if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           registry-url: 'https://registry.npmjs.org'
       - name: Check the Token Is Present
         if: steps.suffix.outputs.skip == 'false' && !inputs.skip_npm
@@ -163,7 +163,7 @@ jobs:
         if: steps.suffix.outputs.skip == 'false' && !inputs.skip_github_npm
         uses: actions/setup-node@v7
         with:
-          node-version: '24'
+          node-version: '26'
           registry-url: 'https://npm.pkg.github.com'
           scope: '@drupflare'
       - name: Check Whether the Version Is Already on GitHub Packages
